@@ -119,7 +119,6 @@ class App(tk.Tk):
         super().__init__()
         self.title('Multi Locator')
         self.geometry('600x600')
-        self._orig_height = 600
         self.resizable(False, False)
 
         ttk.Style(self).theme_use('clam')
@@ -457,21 +456,19 @@ class App(tk.Tk):
         hide_window = self.hide_window_var.get()
         if hide_window:
             self.withdraw()
-        else:
-            self._orig_height = self.winfo_height()
-            w = self.winfo_width()
-            x = self.winfo_x()
-            y = self.winfo_y()
-            self.geometry(f"{w}x270+{x}+{y}")
+
+        orig_image = getattr(self.photo_label, 'image', None)
+        orig_text = self.photo_label.cget('text')
+        self.photo_label.config(image='', text='')
 
         def finish_search():
             if hide_window:
                 self.deiconify()
-            w = self.winfo_width()
-            x = self.winfo_x()
-            y = self.winfo_y()
-            h = getattr(self, '_orig_height', 600)
-            self.geometry(f"{w}x{h}+{x}+{y}")
+            if orig_image:
+                self.photo_label.config(image=orig_image, text='')
+                self.photo_label.image = orig_image
+            else:
+                self.photo_label.config(image='', text=orig_text)
 
         def run_items(idx=0):
             if idx >= len(self.items):

@@ -185,7 +185,8 @@ class App(tk.Tk):
         self.log_label.bind('<Button-1>', self.copy_log)
 
         self.hotkey_var.trace_add('write', self.update_hotkey)
-<<<< codex/修复红点定位问题
+        self.failsafe_var.trace_add('write', self.update_failsafe)
+        self.update_failsafe()
         self.hotkey_available = False
         if keyboard:
             try:
@@ -195,11 +196,7 @@ class App(tk.Tk):
                 print('Warning: global hotkeys are unavailable')
         else:
             print('Warning: global hotkeys are unavailable')
-=======
-        self.failsafe_var.trace_add('write', self.update_failsafe)
-        self.update_failsafe()
-        keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
->>>> main
+        
         self.protocol('WM_DELETE_WINDOW', self.on_close)
 
     def log(self, msg):

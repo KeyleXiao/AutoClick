@@ -7,6 +7,7 @@ AutoClick provides a simple way to locate a template image inside a bigger scree
 - ORB based feature matching with a template fallback
 - Screenshot cropping interface for quickly creating templates
 - Global hotkey to trigger searches
+- Optional PyAutoGUI fail-safe toggle
 - Works on Windows, Linux and macOS
 
 ## Requirements
@@ -48,6 +49,11 @@ Press the configured hotkey (default `F2`) to scan the screen for your templates
 Enable **Auto Start** in the settings window if you want the start button to run
 all items from top to bottom automatically. When unchecked, only the currently
 selected item is executed when you press start.
+
+The settings window also provides a **Fail-safe** option. When enabled (the
+default), moving the mouse to any screen corner aborts automation. You can
+disable this behavior by unchecking the box or passing `--disable-failsafe` to
+`cli_workflow.py`.
 
 ## CLI Workflow Tool
 

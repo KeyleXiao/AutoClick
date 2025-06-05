@@ -6,7 +6,35 @@ import os
 import json
 import base64
 import pyautogui
-import keyboard
+import sys
+
+try:
+    import keyboard as _keyboard
+except Exception:
+    _keyboard = None
+
+if sys.platform == 'darwin':
+    from pynput import keyboard as _pynput_keyboard
+
+    class _MacHotkey:
+        def __init__(self):
+            self._listener = None
+
+        def add_hotkey(self, key, callback):
+            if self._listener:
+                self._listener.stop()
+            hotkey = f'<{key.lower()}>'
+            self._listener = _pynput_keyboard.GlobalHotKeys({hotkey: callback})
+            self._listener.start()
+
+        def clear_all_hotkeys(self):
+            if self._listener:
+                self._listener.stop()
+                self._listener = None
+
+    keyboard = _MacHotkey()
+else:
+    keyboard = _keyboard
 import time
 
 from KeyleFinderModule import KeyleFinderModule

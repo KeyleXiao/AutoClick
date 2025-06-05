@@ -55,6 +55,10 @@ default), moving the mouse to any screen corner aborts automation. You can
 disable this behavior by unchecking the box or passing `--disable-failsafe` to
 `cli_workflow.py`.
 
+Use **Hide window while searching** if you don't want the application window to
+appear in screenshots during template matching. When unchecked, the window
+shrinks to 270 pixels high instead of disappearing.
+
 ## CLI Workflow Tool
 
 You can execute a sequence of template clicks directly from the command line using `cli_workflow.py`:

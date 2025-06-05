@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
 import tempfile
 import os
@@ -38,6 +38,16 @@ else:
 import time
 
 from KeyleFinderModule import KeyleFinderModule
+
+if sys.platform == 'darwin':
+    from pynput.mouse import Controller as _Mouse
+    _mouse = _Mouse()
+
+    def move_mouse(x, y):
+        _mouse.position = (x, y)
+else:
+    def move_mouse(x, y):
+        pyautogui.moveTo(x, y)
 
 HOTKEY = 'F2'
 HOTKEY_OPTIONS = [f'F{i}' for i in range(1, 13)]
@@ -96,12 +106,12 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('Multi Locator')
-        self.geometry('360x360')
+        self.geometry('600x600')
         self.resizable(False, False)
 
         ttk.Style(self).theme_use('clam')
 
-        self.items = []  # each item is {'path': path, 'double_click': False}
+        self.items = []  # each item is a dict with action, delay etc
         self.debug_var = tk.BooleanVar(value=False)
         self.auto_start_var = tk.BooleanVar(value=False)
         self.loop_var = tk.BooleanVar(value=False)
@@ -130,16 +140,23 @@ class App(tk.Tk):
 
         self.tree = ttk.Treeview(
             self,
-            columns=('click',),
+            columns=('action', 'delay', 'interrupt', 'enable'),
             show='tree headings',
             height=8,
         )
         self.tree.heading('#0', text='名称')
         self.tree.column('#0', width=200)
-        self.tree.heading('click', text='点击')
-        self.tree.column('click', width=60, anchor='center')
+        self.tree.heading('action', text='动作')
+        self.tree.column('action', width=60, anchor='center')
+        self.tree.heading('delay', text='延迟(ms)')
+        self.tree.column('delay', width=70, anchor='center')
+        self.tree.heading('interrupt', text='中断')
+        self.tree.column('interrupt', width=50, anchor='center')
+        self.tree.heading('enable', text='启用')
+        self.tree.column('enable', width=50, anchor='center')
         self.tree.pack(padx=10, pady=5, fill='x')
         self.tree.bind('<Double-1>', self.on_tree_double_click)
+        self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
         self.photo_label = ttk.Label(self, text='No Image', relief='groove')
         self.photo_label.pack(padx=10, pady=5, fill='both', expand=True)
@@ -159,15 +176,50 @@ class App(tk.Tk):
         self.clipboard_clear()
         self.clipboard_append(self.log_label.cget('text'))
 
+    def on_tree_select(self, _):
+        sel = self.tree.selection()
+        if not sel:
+            return
+        idx = self.tree.index(sel[0])
+        path = self.items[idx]['path']
+        if os.path.exists(path):
+            img = Image.open(path)
+            img.thumbnail((200, 200))
+            tk_img = ImageTk.PhotoImage(img)
+            self.photo_label.config(image=tk_img, text='')
+            self.photo_label.image = tk_img
+
+    def refresh_tree_row(self, idx):
+        item_id = self.tree.get_children()[idx]
+        item = self.items[idx]
+        action_map = {'single': '单击', 'double': '双击', 'long': '长按'}
+        self.tree.item(item_id, text=os.path.basename(item['path']))
+        self.tree.set(item_id, 'action', action_map.get(item.get('action', 'single'), '单击'))
+        self.tree.set(item_id, 'delay', str(item.get('delay', 0)))
+        self.tree.set(item_id, 'interrupt', '✔' if item.get('interrupt') else '')
+        self.tree.set(item_id, 'enable', '✔' if item.get('enable', True) else '')
+
     def on_tree_double_click(self, event):
         item_id = self.tree.identify_row(event.y)
         column = self.tree.identify_column(event.x)
-        if not item_id or column != '#1':
+        if not item_id:
             return
         idx = self.tree.index(item_id)
         item = self.items[idx]
-        item['double_click'] = not item.get('double_click', False)
-        self.tree.set(item_id, 'click', '双击' if item['double_click'] else '单击')
+        if column == '#1':  # action
+            order = ['single', 'double', 'long']
+            current = item.get('action', 'single')
+            item['action'] = order[(order.index(current) + 1) % 3]
+        elif column == '#2':  # delay
+            val = simpledialog.askinteger('Delay', 'Delay in ms:', initialvalue=item.get('delay', 0), minvalue=0)
+            if val is None:
+                return
+            item['delay'] = val
+        elif column == '#3':  # interrupt
+            item['interrupt'] = not item.get('interrupt', False)
+        elif column == '#4':  # enable
+            item['enable'] = not item.get('enable', True)
+        self.refresh_tree_row(idx)
 
     def add_item(self):
         self.iconify()
@@ -187,8 +239,9 @@ class App(tk.Tk):
         tk_img = ImageTk.PhotoImage(img)
         self.photo_label.config(image=tk_img, text='')
         self.photo_label.image = tk_img
-        self.items.append({'path': path, 'double_click': False})
-        self.tree.insert('', 'end', text=os.path.basename(path), values=('单击',))
+        self.items.append({'path': path, 'action': 'single', 'delay': 0, 'interrupt': False, 'enable': True})
+        self.tree.insert('', 'end', text=os.path.basename(path), values=('', '', '', ''))
+        self.refresh_tree_row(len(self.items) - 1)
         if self.auto_start_var.get():
             self.trigger_search()
 
@@ -203,7 +256,13 @@ class App(tk.Tk):
         for item in self.items:
             with open(item['path'], 'rb') as f:
                 encoded = base64.b64encode(f.read()).decode('utf-8')
-            data.append({'image': encoded, 'double_click': item.get('double_click', False)})
+            data.append({
+                'image': encoded,
+                'action': item.get('action', 'single'),
+                'delay': item.get('delay', 0),
+                'interrupt': item.get('interrupt', False),
+                'enable': item.get('enable', True)
+            })
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(data, f)
         self.log(f'Exported {len(self.items)} items to {file}')
@@ -219,10 +278,16 @@ class App(tk.Tk):
             with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
                 tmp.write(img_data)
                 path = tmp.name
-            dbl = entry.get('double_click', False)
-            self.items.append({'path': path, 'double_click': dbl})
-            txt = '双击' if dbl else '单击'
-            self.tree.insert('', 'end', text=os.path.basename(path), values=(txt,))
+            item = {
+                'path': path,
+                'action': entry.get('action', 'single' if not entry.get('double_click') else 'double'),
+                'delay': entry.get('delay', 0),
+                'interrupt': entry.get('interrupt', False),
+                'enable': entry.get('enable', True)
+            }
+            self.items.append(item)
+            self.tree.insert('', 'end', text=os.path.basename(path), values=('', '', '', ''))
+            self.refresh_tree_row(len(self.items) - 1)
         self.log(f'Imported {len(data)} items from {file}')
 
     def update_hotkey(self, *_):
@@ -252,30 +317,56 @@ class App(tk.Tk):
         if not self.items:
             messagebox.showwarning('Warning', 'Add item first')
             return
-        def run_items():
-            for idx, item in enumerate(self.items):
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                    screenshot = pyautogui.screenshot()
-                    screenshot.save(tmp.name)
-                    finder = KeyleFinderModule(tmp.name)
-                    result = finder.locate(item['path'], debug=self.debug_var.get())
-                os.unlink(tmp.name)
-                if result.get('status') == 0:
-                    tl = result['top_left']
-                    br = result['bottom_right']
-                    center_x = (tl[0] + br[0]) // 2
-                    center_y = (tl[1] + br[1]) // 2
-                    pyautogui.moveTo(center_x, center_y)
-                    if item.get('double_click'):
-                        pyautogui.click(clicks=2)
-                    else:
-                        pyautogui.click()
-                    self.log(f'Item {idx} matched at {center_x},{center_y}')
+        def run_items(idx=0):
+            if idx >= len(self.items):
+                if self.loop_var.get():
+                    self.after(500, lambda: run_items(0))
+                return
+
+            item = self.items[idx]
+            if not item.get('enable', True):
+                self.after(10, lambda: run_items(idx + 1))
+                return
+
+            item_id = self.tree.get_children()[idx]
+            self.tree.item(item_id, tags=('running',))
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+                screenshot = pyautogui.screenshot()
+                screenshot.save(tmp.name)
+                finder = KeyleFinderModule(tmp.name)
+                result = finder.locate(item['path'], debug=self.debug_var.get())
+            os.unlink(tmp.name)
+
+            if result.get('status') == 0:
+                tl = result['top_left']
+                br = result['bottom_right']
+                center_x = (tl[0] + br[0]) // 2
+                center_y = (tl[1] + br[1]) // 2
+                move_mouse(center_x, center_y)
+                if item.get('action') == 'double':
+                    pyautogui.click(clicks=2)
+                elif item.get('action') == 'long':
+                    pyautogui.mouseDown()
+                    time.sleep(1)
+                    pyautogui.mouseUp()
                 else:
-                    self.log(f'Item {idx} match failed')
-            if self.loop_var.get():
-                self.after(500, run_items)
-        self.after(100, run_items)
+                    pyautogui.click()
+                self.tree.item(item_id, tags=('success',))
+                self.log(f'Item {idx} matched at {center_x},{center_y}')
+                delay = item.get('delay', 0) / 1000.0
+                self.after(int(delay * 1000), lambda: run_items(idx + 1))
+            else:
+                self.tree.item(item_id, tags=('fail',))
+                self.log(f'Item {idx} match failed')
+                if item.get('interrupt'):
+                    self.after(10, lambda: run_items(0))
+                else:
+                    self.after(10, lambda: run_items(idx + 1))
+
+        self.tree.tag_configure('running', background='lightgreen')
+        self.tree.tag_configure('success', background='lightgreen')
+        self.tree.tag_configure('fail', background='lightcoral')
+        self.after(100, lambda: run_items(0))
 
     def on_close(self):
         keyboard.clear_all_hotkeys()

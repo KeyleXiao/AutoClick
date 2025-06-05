@@ -158,8 +158,11 @@ class App(tk.Tk):
         self.tree.bind('<Double-1>', self.on_tree_double_click)
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
+        self.current_index = None
+
         self.photo_label = ttk.Label(self, text='No Image', relief='groove')
         self.photo_label.pack(padx=10, pady=5, fill='both', expand=True)
+        self.photo_label.bind('<Button-1>', self.on_photo_click)
 
         self.log_label = ttk.Label(self, text='', foreground='gray')
         self.log_label.pack(side='bottom', fill='x')
@@ -176,18 +179,49 @@ class App(tk.Tk):
         self.clipboard_clear()
         self.clipboard_append(self.log_label.cget('text'))
 
+    def update_photo(self, idx):
+        path = self.items[idx]['path']
+        offset = self.items[idx].get('offset', [0.5, 0.5])
+        if os.path.exists(path):
+            img = Image.open(path)
+            w, h = img.size
+            dot_x = int(offset[0] * w)
+            dot_y = int(offset[1] * h)
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(img)
+            r = 2
+            draw.ellipse((dot_x - r, dot_y - r, dot_x + r, dot_y + r), fill='red')
+            img.thumbnail((200, 200))
+            tk_img = ImageTk.PhotoImage(img)
+            self.photo_label.config(image=tk_img, text='')
+            self.photo_label.image = tk_img
+            self.photo_label.img_width, self.photo_label.img_height = img.size
+
+    def on_photo_click(self, event):
+        if self.current_index is None:
+            return
+        img_w = getattr(self.photo_label, 'img_width', None)
+        img_h = getattr(self.photo_label, 'img_height', None)
+        if not img_w or not img_h:
+            return
+        lbl_w = self.photo_label.winfo_width()
+        lbl_h = self.photo_label.winfo_height()
+        offset_x = event.x - (lbl_w - img_w) // 2
+        offset_y = event.y - (lbl_h - img_h) // 2
+        if not (0 <= offset_x <= img_w and 0 <= offset_y <= img_h):
+            return
+        rel_x = offset_x / img_w
+        rel_y = offset_y / img_h
+        self.items[self.current_index]['offset'] = [rel_x, rel_y]
+        self.update_photo(self.current_index)
+
     def on_tree_select(self, _):
         sel = self.tree.selection()
         if not sel:
             return
         idx = self.tree.index(sel[0])
-        path = self.items[idx]['path']
-        if os.path.exists(path):
-            img = Image.open(path)
-            img.thumbnail((200, 200))
-            tk_img = ImageTk.PhotoImage(img)
-            self.photo_label.config(image=tk_img, text='')
-            self.photo_label.image = tk_img
+        self.current_index = idx
+        self.update_photo(idx)
 
     def refresh_tree_row(self, idx):
         item_id = self.tree.get_children()[idx]
@@ -239,9 +273,20 @@ class App(tk.Tk):
         tk_img = ImageTk.PhotoImage(img)
         self.photo_label.config(image=tk_img, text='')
         self.photo_label.image = tk_img
-        self.items.append({'path': path, 'action': 'single', 'delay': 0, 'interrupt': False, 'enable': True})
+        item = {
+            'path': path,
+            'action': 'single',
+            'delay': 0,
+            'interrupt': False,
+            'enable': True,
+            'offset': [0.5, 0.5]
+        }
+        self.items.append(item)
         self.tree.insert('', 'end', text=os.path.basename(path), values=('', '', '', ''))
-        self.refresh_tree_row(len(self.items) - 1)
+        idx = len(self.items) - 1
+        self.refresh_tree_row(idx)
+        self.current_index = idx
+        self.update_photo(idx)
         if self.auto_start_var.get():
             self.trigger_search()
 
@@ -261,7 +306,8 @@ class App(tk.Tk):
                 'action': item.get('action', 'single'),
                 'delay': item.get('delay', 0),
                 'interrupt': item.get('interrupt', False),
-                'enable': item.get('enable', True)
+                'enable': item.get('enable', True),
+                'offset': item.get('offset', [0.5, 0.5])
             })
         with open(file, 'w', encoding='utf-8') as f:
             json.dump(data, f)
@@ -283,11 +329,15 @@ class App(tk.Tk):
                 'action': entry.get('action', 'single' if not entry.get('double_click') else 'double'),
                 'delay': entry.get('delay', 0),
                 'interrupt': entry.get('interrupt', False),
-                'enable': entry.get('enable', True)
+                'enable': entry.get('enable', True),
+                'offset': entry.get('offset', [0.5, 0.5])
             }
             self.items.append(item)
             self.tree.insert('', 'end', text=os.path.basename(path), values=('', '', '', ''))
-            self.refresh_tree_row(len(self.items) - 1)
+            idx = len(self.items) - 1
+            self.refresh_tree_row(idx)
+            self.current_index = idx
+            self.update_photo(idx)
         self.log(f'Imported {len(data)} items from {file}')
 
     def update_hotkey(self, *_):
@@ -340,9 +390,12 @@ class App(tk.Tk):
             if result.get('status') == 0:
                 tl = result['top_left']
                 br = result['bottom_right']
-                center_x = (tl[0] + br[0]) // 2
-                center_y = (tl[1] + br[1]) // 2
-                move_mouse(center_x, center_y)
+                width = br[0] - tl[0]
+                height = br[1] - tl[1]
+                offset = item.get('offset', [0.5, 0.5])
+                click_x = tl[0] + int(width * offset[0])
+                click_y = tl[1] + int(height * offset[1])
+                move_mouse(click_x, click_y)
                 if item.get('action') == 'double':
                     pyautogui.click(clicks=2)
                 elif item.get('action') == 'long':
@@ -352,7 +405,7 @@ class App(tk.Tk):
                 else:
                     pyautogui.click()
                 self.tree.item(item_id, tags=('success',))
-                self.log(f'Item {idx} matched at {center_x},{center_y}')
+                self.log(f'Item {idx} matched at {click_x},{click_y}')
                 delay = item.get('delay', 0) / 1000.0
                 self.after(int(delay * 1000), lambda: run_items(idx + 1))
             else:

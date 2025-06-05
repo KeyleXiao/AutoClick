@@ -127,6 +127,7 @@ class App(tk.Tk):
         self.debug_var = tk.BooleanVar(value=False)
         self.auto_start_var = tk.BooleanVar(value=False)
         self.loop_var = tk.BooleanVar(value=False)
+        self.failsafe_var = tk.BooleanVar(value=True)
         self.hotkey_var = tk.StringVar(value=HOTKEY)
 
         top = ttk.Frame(self)
@@ -181,6 +182,8 @@ class App(tk.Tk):
         self.log_label.bind('<Button-1>', self.copy_log)
 
         self.hotkey_var.trace_add('write', self.update_hotkey)
+        self.failsafe_var.trace_add('write', self.update_failsafe)
+        self.update_failsafe()
         keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
         self.protocol('WM_DELETE_WINDOW', self.on_close)
 
@@ -357,6 +360,9 @@ class App(tk.Tk):
         keyboard.clear_all_hotkeys()
         keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
 
+    def update_failsafe(self, *_):
+        pyautogui.FAILSAFE = self.failsafe_var.get()
+
     def show_about(self):
         messagebox.showinfo('About', 'KeyleFinder\nAuthor: keyle\nhttps://vrast.cn')
 
@@ -366,6 +372,7 @@ class App(tk.Tk):
         win.resizable(False, False)
         ttk.Checkbutton(win, text='Debug', variable=self.debug_var).pack(anchor='w', padx=10, pady=5)
         ttk.Checkbutton(win, text='Auto Start', variable=self.auto_start_var).pack(anchor='w', padx=10, pady=5)
+        ttk.Checkbutton(win, text='Fail-safe', variable=self.failsafe_var).pack(anchor='w', padx=10, pady=5)
         loop_chk = ttk.Checkbutton(win, text='循环执行 (危险)', variable=self.loop_var)
         loop_chk.pack(anchor='w', padx=10, pady=5)
         loop_chk.config(style='Danger.TCheckbutton')

@@ -196,6 +196,7 @@ class App(tk.Tk):
         offset = self.items[idx].get('offset', [0.5, 0.5])
         if os.path.exists(path):
             img = Image.open(path)
+            img.thumbnail((200, 200))
             w, h = img.size
             dot_x = int(offset[0] * w)
             dot_y = int(offset[1] * h)
@@ -203,7 +204,6 @@ class App(tk.Tk):
             draw = ImageDraw.Draw(img)
             r = 2
             draw.ellipse((dot_x - r, dot_y - r, dot_x + r, dot_y + r), fill='red')
-            img.thumbnail((200, 200))
             tk_img = ImageTk.PhotoImage(img)
             self.photo_label.config(image=tk_img, text='')
             self.photo_label.image = tk_img
@@ -252,6 +252,9 @@ class App(tk.Tk):
             return
         idx = self.tree.index(item_id)
         item = self.items[idx]
+        if column == '#0':
+            self.trigger_search(idx)
+            return
         if column == '#1':  # action
             order = ['single', 'double', 'long']
             current = item.get('action', 'single')
@@ -373,10 +376,13 @@ class App(tk.Tk):
         style = ttk.Style(win)
         style.configure('Danger.TCheckbutton', foreground='red')
 
-    def trigger_search(self):
+    def trigger_search(self, start_idx=None):
         if not self.items:
             messagebox.showwarning('Warning', 'Add item first')
             return
+        for iid in self.tree.get_children():
+            self.tree.item(iid, tags=())
+
         def run_items(idx=0):
             if idx >= len(self.items):
                 if self.loop_var.get():
@@ -414,7 +420,7 @@ class App(tk.Tk):
                     pyautogui.mouseUp()
                 else:
                     pyautogui.click()
-                self.tree.item(item_id, tags=('success',))
+                self.tree.item(item_id, tags=())
                 self.log(f'Item {idx} matched at {click_x},{click_y}')
                 delay = item.get('delay', 0) / 1000.0
                 self.after(int(delay * 1000), lambda: run_items(idx + 1))
@@ -427,17 +433,17 @@ class App(tk.Tk):
                     self.after(10, lambda: run_items(idx + 1))
 
         self.tree.tag_configure('running', background='lightgreen')
-        self.tree.tag_configure('success', background='lightgreen')
         self.tree.tag_configure('fail', background='lightcoral')
 
-        if self.auto_start_var.get():
-            start_idx = 0
-        else:
-            sel = self.tree.selection()
-            if not sel:
-                messagebox.showinfo('Info', 'Select an item to run or enable Auto Start')
-                return
-            start_idx = self.tree.index(sel[0])
+        if start_idx is None:
+            if self.auto_start_var.get():
+                start_idx = 0
+            else:
+                sel = self.tree.selection()
+                if not sel:
+                    messagebox.showinfo('Info', 'Select an item to run or enable Auto Start')
+                    return
+                start_idx = self.tree.index(sel[0])
 
         self.after(100, lambda: run_items(start_idx))
 

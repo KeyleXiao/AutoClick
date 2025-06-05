@@ -8,6 +8,7 @@ AutoClick provides a simple way to locate a template image inside a bigger scree
 - Screenshot cropping interface for quickly creating templates
 - Global hotkey to trigger searches
 - Optional PyAutoGUI fail-safe toggle
+- Trash button to delete items from the list
 - Works on Windows, Linux and macOS
 
 ## Requirements
@@ -46,8 +47,8 @@ python gui_locator_multi.py
 
 Press the configured hotkey (default `F2`) to scan the screen for your templates.
 
-Enable **Auto Start** in the settings window if you want the start button to run
-all items from top to bottom automatically. When unchecked, only the currently
+**Auto Start** is now enabled by default, causing the start button to run all
+items from top to bottom automatically. When unchecked, only the currently
 selected item is executed when you press start.
 
 The settings window also provides a **Fail-safe** option. When enabled (the
@@ -78,6 +79,7 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现开发�
 - 基于 ORB 的特征匹配，失败时回退到模板匹配
 - 方便的截图修剪界面用于创建模板
 - 全局热键触发搜索
+- 提供删除按钮可移除列表项
 - 支持 Windows、Linux 和 macOS
 - 在 macOS 中，需在「系统设置 → 隐私与安全 → 辅助功能」中为 Python 或终端
   授权，以便程序能够控制鼠标和键盘

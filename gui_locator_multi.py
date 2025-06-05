@@ -119,13 +119,14 @@ class App(tk.Tk):
         super().__init__()
         self.title('Multi Locator')
         self.geometry('600x600')
+        self._orig_height = 600
         self.resizable(False, False)
 
         ttk.Style(self).theme_use('clam')
 
         self.items = []  # each item is a dict with action, delay etc
         self.debug_var = tk.BooleanVar(value=False)
-        self.auto_start_var = tk.BooleanVar(value=False)
+        self.auto_start_var = tk.BooleanVar(value=True)
         self.loop_var = tk.BooleanVar(value=False)
         self.failsafe_var = tk.BooleanVar(value=True)
         self.hide_window_var = tk.BooleanVar(value=True)
@@ -139,6 +140,9 @@ class App(tk.Tk):
 
         start_btn = ttk.Button(top, text='▶', width=3, command=self.trigger_search)
         start_btn.pack(side='left', padx=2)
+
+        del_btn = ttk.Button(top, text='🗑', width=3, command=self.delete_item)
+        del_btn.pack(side='left', padx=2)
 
         export_btn = ttk.Button(top, text='💾', width=3, command=self.export_items)
         export_btn.pack(side='left', padx=2)
@@ -368,6 +372,27 @@ class App(tk.Tk):
             self.update_photo(idx)
         self.log(f'Imported {len(data)} items from {file}')
 
+    def delete_item(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('Info', 'Select an item to delete')
+            return
+        item_id = sel[0]
+        idx = self.tree.index(item_id)
+        self.tree.delete(item_id)
+        item = self.items.pop(idx)
+        try:
+            os.unlink(item['path'])
+        except Exception:
+            pass
+        if self.items:
+            self.current_index = 0
+            self.tree.selection_set(self.tree.get_children()[0])
+            self.update_photo(0)
+        else:
+            self.current_index = None
+            self.photo_label.config(image='', text='No Image')
+
     def update_hotkey(self, *_):
         if not getattr(self, 'hotkey_available', False):
             return
@@ -384,17 +409,27 @@ class App(tk.Tk):
         win = tk.Toplevel(self)
         win.title('Settings')
         win.resizable(False, False)
-        ttk.Checkbutton(win, text='Debug', variable=self.debug_var).pack(anchor='w', padx=10, pady=5)
-        ttk.Checkbutton(win, text='Auto Start', variable=self.auto_start_var).pack(anchor='w', padx=10, pady=5)
-        ttk.Checkbutton(win, text='Fail-safe', variable=self.failsafe_var).pack(anchor='w', padx=10, pady=5)
+        ttk.Checkbutton(win, text='Debug', variable=self.debug_var).pack(anchor='w', padx=10, pady=(5, 0))
+        ttk.Label(win, text='调试模式，显示匹配结果').pack(anchor='w', padx=30, pady=(0, 5))
+
+        ttk.Checkbutton(win, text='Auto Start', variable=self.auto_start_var).pack(anchor='w', padx=10, pady=(0, 0))
+        ttk.Label(win, text='自动从上到下执行全部项目').pack(anchor='w', padx=30, pady=(0, 5))
+
+        ttk.Checkbutton(win, text='Fail-safe', variable=self.failsafe_var).pack(anchor='w', padx=10, pady=(0, 0))
+        ttk.Label(win, text='将鼠标移到屏幕角落终止').pack(anchor='w', padx=30, pady=(0, 5))
+
         ttk.Checkbutton(win, text='Hide window while searching',
-                        variable=self.hide_window_var).pack(anchor='w', padx=10, pady=5)
+                        variable=self.hide_window_var).pack(anchor='w', padx=10, pady=(0, 0))
+        ttk.Label(win, text='搜索时隐藏主窗体').pack(anchor='w', padx=30, pady=(0, 5))
+
         loop_chk = ttk.Checkbutton(win, text='循环执行 (危险)', variable=self.loop_var)
-        loop_chk.pack(anchor='w', padx=10, pady=5)
+        loop_chk.pack(anchor='w', padx=10, pady=(0, 0))
+        ttk.Label(win, text='完成后从头开始重复').pack(anchor='w', padx=30, pady=(0, 5))
         loop_chk.config(style='Danger.TCheckbutton')
         ttk.Label(win, text='Hotkey:').pack(anchor='w', padx=10, pady=(10, 0))
         ttk.Combobox(win, width=4, state='readonly',
-                     values=HOTKEY_OPTIONS, textvariable=self.hotkey_var).pack(anchor='w', padx=10, pady=5)
+                     values=HOTKEY_OPTIONS, textvariable=self.hotkey_var).pack(anchor='w', padx=10, pady=(0, 0))
+        ttk.Label(win, text='触发搜索的快捷键').pack(anchor='w', padx=30, pady=(0, 5))
         ttk.Button(win, text='Close', command=win.destroy).pack(pady=10)
         style = ttk.Style(win)
         style.configure('Danger.TCheckbutton', foreground='red')
@@ -404,7 +439,10 @@ class App(tk.Tk):
             messagebox.showwarning('Warning', 'Add item first')
             return
         for iid in self.tree.get_children():
-            self.tree.item(iid, tags=())
+            tags = list(self.tree.item(iid, 'tags'))
+            if 'running' in tags:
+                tags.remove('running')
+            self.tree.item(iid, tags=tuple(tags))
 
         if start_idx is None:
             if self.auto_start_var.get():
@@ -429,12 +467,11 @@ class App(tk.Tk):
         def finish_search():
             if hide_window:
                 self.deiconify()
-            else:
-                w = self.winfo_width()
-                x = self.winfo_x()
-                y = self.winfo_y()
-                h = getattr(self, '_orig_height', 600)
-                self.geometry(f"{w}x{h}+{x}+{y}")
+            w = self.winfo_width()
+            x = self.winfo_x()
+            y = self.winfo_y()
+            h = getattr(self, '_orig_height', 600)
+            self.geometry(f"{w}x{h}+{x}+{y}")
 
         def run_items(idx=0):
             if idx >= len(self.items):
@@ -475,7 +512,12 @@ class App(tk.Tk):
                     pyautogui.mouseUp()
                 else:
                     pyautogui.click()
-                self.tree.item(item_id, tags=())
+                tags = list(self.tree.item(item_id, 'tags'))
+                if 'running' in tags:
+                    tags.remove('running')
+                if 'fail' in tags:
+                    tags.remove('fail')
+                self.tree.item(item_id, tags=tuple(tags))
                 self.log(f'Item {idx} matched at {click_x},{click_y}')
                 delay = item.get('delay', 0) / 1000.0
                 self.after(int(delay * 1000), lambda: run_items(idx + 1))

@@ -173,8 +173,10 @@ class App(tk.Tk):
 
         self.current_index = None
 
-        self.photo_label = ttk.Label(self, text='No Image', relief='groove')
-        self.photo_label.pack(padx=10, pady=5, fill='both', expand=True)
+        self.photo_frame = ttk.Frame(self)
+        self.photo_frame.pack(padx=10, pady=5, fill='both', expand=True)
+        self.photo_label = ttk.Label(self.photo_frame, text='No Image', relief='groove')
+        self.photo_label.pack(expand=True)
         self.photo_label.bind('<Button-1>', self.on_photo_click)
 
         self.log_label = ttk.Label(self, text='', foreground='gray')
@@ -182,9 +184,21 @@ class App(tk.Tk):
         self.log_label.bind('<Button-1>', self.copy_log)
 
         self.hotkey_var.trace_add('write', self.update_hotkey)
+<<<< codex/修复红点定位问题
+        self.hotkey_available = False
+        if keyboard:
+            try:
+                keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
+                self.hotkey_available = True
+            except Exception:
+                print('Warning: global hotkeys are unavailable')
+        else:
+            print('Warning: global hotkeys are unavailable')
+=======
         self.failsafe_var.trace_add('write', self.update_failsafe)
         self.update_failsafe()
         keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
+>>>> main
         self.protocol('WM_DELETE_WINDOW', self.on_close)
 
     def log(self, msg):
@@ -357,6 +371,8 @@ class App(tk.Tk):
         self.log(f'Imported {len(data)} items from {file}')
 
     def update_hotkey(self, *_):
+        if not getattr(self, 'hotkey_available', False):
+            return
         keyboard.clear_all_hotkeys()
         keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
 
@@ -455,7 +471,8 @@ class App(tk.Tk):
         self.after(100, lambda: run_items(start_idx))
 
     def on_close(self):
-        keyboard.clear_all_hotkeys()
+        if getattr(self, 'hotkey_available', False):
+            keyboard.clear_all_hotkeys()
         self.destroy()
 
 

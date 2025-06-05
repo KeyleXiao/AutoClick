@@ -128,6 +128,7 @@ class App(tk.Tk):
         self.auto_start_var = tk.BooleanVar(value=False)
         self.loop_var = tk.BooleanVar(value=False)
         self.failsafe_var = tk.BooleanVar(value=True)
+        self.hide_window_var = tk.BooleanVar(value=True)
         self.hotkey_var = tk.StringVar(value=HOTKEY)
 
         top = ttk.Frame(self)
@@ -373,6 +374,8 @@ class App(tk.Tk):
         ttk.Checkbutton(win, text='Debug', variable=self.debug_var).pack(anchor='w', padx=10, pady=5)
         ttk.Checkbutton(win, text='Auto Start', variable=self.auto_start_var).pack(anchor='w', padx=10, pady=5)
         ttk.Checkbutton(win, text='Fail-safe', variable=self.failsafe_var).pack(anchor='w', padx=10, pady=5)
+        ttk.Checkbutton(win, text='Hide window while searching',
+                        variable=self.hide_window_var).pack(anchor='w', padx=10, pady=5)
         loop_chk = ttk.Checkbutton(win, text='循环执行 (危险)', variable=self.loop_var)
         loop_chk.pack(anchor='w', padx=10, pady=5)
         loop_chk.config(style='Danger.TCheckbutton')
@@ -390,10 +393,42 @@ class App(tk.Tk):
         for iid in self.tree.get_children():
             self.tree.item(iid, tags=())
 
+        if start_idx is None:
+            if self.auto_start_var.get():
+                start_idx = 0
+            else:
+                sel = self.tree.selection()
+                if not sel:
+                    messagebox.showinfo('Info', 'Select an item to run or enable Auto Start')
+                    return
+                start_idx = self.tree.index(sel[0])
+
+        hide_window = self.hide_window_var.get()
+        if hide_window:
+            self.withdraw()
+        else:
+            self._orig_height = self.winfo_height()
+            w = self.winfo_width()
+            x = self.winfo_x()
+            y = self.winfo_y()
+            self.geometry(f"{w}x270+{x}+{y}")
+
+        def finish_search():
+            if hide_window:
+                self.deiconify()
+            else:
+                w = self.winfo_width()
+                x = self.winfo_x()
+                y = self.winfo_y()
+                h = getattr(self, '_orig_height', 600)
+                self.geometry(f"{w}x{h}+{x}+{y}")
+
         def run_items(idx=0):
             if idx >= len(self.items):
                 if self.loop_var.get():
                     self.after(500, lambda: run_items(0))
+                else:
+                    finish_search()
                 return
 
             item = self.items[idx]
@@ -441,16 +476,6 @@ class App(tk.Tk):
 
         self.tree.tag_configure('running', background='lightgreen')
         self.tree.tag_configure('fail', background='lightcoral')
-
-        if start_idx is None:
-            if self.auto_start_var.get():
-                start_idx = 0
-            else:
-                sel = self.tree.selection()
-                if not sel:
-                    messagebox.showinfo('Info', 'Select an item to run or enable Auto Start')
-                    return
-                start_idx = self.tree.index(sel[0])
 
         self.after(100, lambda: run_items(start_idx))
 

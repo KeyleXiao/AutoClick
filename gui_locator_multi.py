@@ -58,12 +58,20 @@ class ScreenCropper(tk.Toplevel):
         super().__init__(master)
         self.callback = callback
         self.screenshot = screenshot
+        self.screen_w = self.winfo_screenwidth()
+        self.screen_h = self.winfo_screenheight()
+        self.scale_x = screenshot.width / self.screen_w
+        self.scale_y = screenshot.height / self.screen_h
         self.attributes('-fullscreen', True)
         self.attributes('-topmost', True)
         self.overrideredirect(True)
         self.canvas = tk.Canvas(self, cursor='cross')
         self.canvas.pack(fill='both', expand=True)
-        self.tk_img = ImageTk.PhotoImage(screenshot)
+        if self.scale_x != 1 or self.scale_y != 1:
+            display_img = screenshot.resize((self.screen_w, self.screen_h))
+        else:
+            display_img = screenshot
+        self.tk_img = ImageTk.PhotoImage(display_img)
         self.canvas.create_image(0, 0, image=self.tk_img, anchor='nw')
         self.rect = None
         self.start_x = 0
@@ -93,11 +101,15 @@ class ScreenCropper(tk.Toplevel):
             return
         x1, y1 = min(self.start_x, event.x), min(self.start_y, event.y)
         x2, y2 = max(self.start_x, event.x), max(self.start_y, event.y)
-        if x2 - x1 < 1 or y2 - y1 < 1:
+        img_x1 = int(x1 * self.scale_x)
+        img_y1 = int(y1 * self.scale_y)
+        img_x2 = int(x2 * self.scale_x)
+        img_y2 = int(y2 * self.scale_y)
+        if img_x2 - img_x1 < 1 or img_y2 - img_y1 < 1:
             self.destroy()
             self.callback(None)
             return
-        cropped = self.screenshot.crop((x1, y1, x2, y2))
+        cropped = self.screenshot.crop((img_x1, img_y1, img_x2, img_y2))
         self.destroy()
         self.callback(cropped)
 
@@ -287,8 +299,6 @@ class App(tk.Tk):
         self.refresh_tree_row(idx)
         self.current_index = idx
         self.update_photo(idx)
-        if self.auto_start_var.get():
-            self.trigger_search()
 
     def export_items(self):
         if not self.items:
@@ -419,7 +429,17 @@ class App(tk.Tk):
         self.tree.tag_configure('running', background='lightgreen')
         self.tree.tag_configure('success', background='lightgreen')
         self.tree.tag_configure('fail', background='lightcoral')
-        self.after(100, lambda: run_items(0))
+
+        if self.auto_start_var.get():
+            start_idx = 0
+        else:
+            sel = self.tree.selection()
+            if not sel:
+                messagebox.showinfo('Info', 'Select an item to run or enable Auto Start')
+                return
+            start_idx = self.tree.index(sel[0])
+
+        self.after(100, lambda: run_items(start_idx))
 
     def on_close(self):
         keyboard.clear_all_hotkeys()

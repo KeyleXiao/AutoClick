@@ -19,6 +19,9 @@ AutoClick provides a simple way to locate a template image inside a bigger scree
 - `keyboard` (Windows/Linux)
 - `pynput` (macOS)
 - On macOS the packages `pyobjc-core` and `pyobjc` are required for screenshots
+- On macOS you also need to grant "Accessibility" permission to your Python
+  interpreter or terminal in **System Preferences → Security & Privacy** so the
+  tool can control the mouse and keyboard.
 
 Install the dependencies with:
 
@@ -42,6 +45,10 @@ python gui_locator_multi.py
 
 Press the configured hotkey (default `F2`) to scan the screen for your templates.
 
+Enable **Auto Start** in the settings window if you want the start button to run
+all items from top to bottom automatically. When unchecked, only the currently
+selected item is executed when you press start.
+
 ## CLI Workflow Tool
 
 You can execute a sequence of template clicks directly from the command line using `cli_workflow.py`:
@@ -62,6 +69,8 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现开发�
 - 方便的截图修剪界面用于创建模板
 - 全局热键触发搜索
 - 支持 Windows、Linux 和 macOS
+- 在 macOS 中，需在「系统设置 → 隐私与安全 → 辅助功能」中为 Python 或终端
+  授权，以便程序能够控制鼠标和键盘
 
 ### 使用
 

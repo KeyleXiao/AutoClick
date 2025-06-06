@@ -66,9 +66,9 @@ def run_workflow(items, debug=False, loop=False, interval=0.5):
                     if pyautogui.position() != long_press_pos:
                         pyautogui.mouseUp()
                         long_press_active = False
-                    else:
-                        pyautogui.mouseUp()
-                        long_press_active = False
+                if long_press_active and item.get('action') != 'long':
+                    pyautogui.mouseUp()
+                    long_press_active = False
 
                 time.sleep(item.get('delay', 0) / 1000.0)
 

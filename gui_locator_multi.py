@@ -481,6 +481,9 @@ class App(tk.Tk):
 
         def run_items(idx=0):
             if idx >= len(self.items):
+                if self.long_press_active:
+                    pyautogui.mouseUp()
+                    self.long_press_active = False
                 if self.loop_var.get():
                     self.after(500, lambda: run_items(0))
                 else:
@@ -492,7 +495,7 @@ class App(tk.Tk):
                 self.after(10, lambda: run_items(idx + 1))
                 return
 
-            if self.long_press_active:
+            if self.long_press_active and item.get('action') != 'long':
                 pyautogui.mouseUp()
                 self.long_press_active = False
 

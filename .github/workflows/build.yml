@@ -85,12 +85,13 @@ jobs:
           WIN_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.create_release.outputs.tag_name }}/GUI_Locator.exe"
           MAC_URL="https://github.com/${{ github.repository }}/releases/download/${{ steps.create_release.outputs.tag_name }}/GUI_Locator"
           sed -i '/<!-- BUILD LINKS START -->/,/<!-- BUILD LINKS END -->/c\\\n<!-- BUILD LINKS START -->\n- [Windows]('"$WIN_URL"')\n- [macOS]('"$MAC_URL"')\n<!-- BUILD LINKS END -->' README.md
-      - name: Commit README update
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add README.md
-          git commit -m "Update build links" || echo "No changes"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        - name: Commit README update
+          run: |
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            git pull --rebase
+            git add README.md
+            git commit -m "Update build links" || echo "No changes"
+            git push
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

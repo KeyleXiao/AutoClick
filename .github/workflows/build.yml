@@ -19,7 +19,8 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo
+          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo \
+            opencv-python-headless numpy Pillow
       - name: Build EXE
         run: |
           pyinstaller --onefile --noconsole --name "GUI_Locator" `
@@ -27,6 +28,7 @@ jobs:
             --hidden-import pyscreeze `
             --hidden-import pytweening `
             --hidden-import mouseinfo `
+            --hidden-import cv2 `
             --collect-data pyautogui `
             gui_locator_multi.py
       - name: Upload artifact
@@ -45,10 +47,18 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo pyobjc-core pyobjc
+          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo \
+            pyobjc-core pyobjc opencv-python-headless numpy Pillow
       - name: Build macOS binary
         run: |
-          pyinstaller --onefile --name GUI_Locator gui_locator_multi.py
+          pyinstaller --onefile --name GUI_Locator \
+            --hidden-import pyautogui \
+            --hidden-import pyscreeze \
+            --hidden-import pytweening \
+            --hidden-import mouseinfo \
+            --hidden-import cv2 \
+            --collect-data pyautogui \
+            gui_locator_multi.py
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

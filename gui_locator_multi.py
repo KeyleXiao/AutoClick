@@ -495,13 +495,13 @@ class App(tk.Tk):
                 self.after(10, lambda: run_items(idx + 1))
                 return
 
-            if self.long_press_active and item.get('action') != 'long':
-                pyautogui.mouseUp()
-                self.long_press_active = False
-
             delay = item.get('delay', 0)
 
             def execute():
+                if self.long_press_active and item.get('action') != 'long':
+                    pyautogui.mouseUp()
+                    self.long_press_active = False
+
                 item_id = self.tree.get_children()[idx]
                 self.tree.item(item_id, tags=('running',))
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:

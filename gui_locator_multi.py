@@ -495,8 +495,6 @@ class App(tk.Tk):
                 self.after(10, lambda: run_items(idx + 1))
                 return
 
-            delay = item.get('delay', 0)
-
             def execute():
                 if self.long_press_active and item.get('action') != 'long':
                     pyautogui.mouseUp()
@@ -511,6 +509,7 @@ class App(tk.Tk):
                     result = finder.locate(item['path'], debug=self.debug_var.get())
                 os.unlink(tmp.name)
 
+                next_idx = idx + 1
                 if result.get('status') == 0:
                     tl = result['top_left']
                     br = result['bottom_right']
@@ -535,16 +534,16 @@ class App(tk.Tk):
                         tags.remove('fail')
                     self.tree.item(item_id, tags=tuple(tags))
                     self.log(f'Item {idx} matched at {click_x},{click_y}')
-                    self.after(10, lambda: run_items(idx + 1))
                 else:
                     self.tree.item(item_id, tags=('fail',))
                     self.log(f'Item {idx} match failed')
                     if item.get('interrupt'):
-                        self.after(10, lambda: run_items(0))
-                    else:
-                        self.after(10, lambda: run_items(idx + 1))
+                        next_idx = 0
 
-            self.after(delay, execute)
+                delay = item.get('delay', 0)
+                self.after(delay, lambda: run_items(next_idx))
+
+            execute()
 
         self.tree.tag_configure('running', background='lightgreen')
         self.tree.tag_configure('fail', background='lightcoral')

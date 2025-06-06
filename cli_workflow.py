@@ -51,19 +51,32 @@ def cleanup_items(items):
 
 
 def run_workflow(items, debug=False, loop=False, interval=0.5):
+    long_press_active = False
+    long_press_pos = None
     try:
         while True:
-            screenshot = pyautogui.screenshot()
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                screenshot.save(tmp.name)
-                screen_path = tmp.name
-            finder = KeyleFinderModule(screen_path)
             idx = 0
             while idx < len(items):
                 item = items[idx]
                 if not item.get('enable', True):
                     idx += 1
                     continue
+
+                if long_press_active:
+                    if pyautogui.position() != long_press_pos:
+                        pyautogui.mouseUp()
+                        long_press_active = False
+                    else:
+                        pyautogui.mouseUp()
+                        long_press_active = False
+
+                time.sleep(item.get('delay', 0) / 1000.0)
+
+                screenshot = pyautogui.screenshot()
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+                    screenshot.save(tmp.name)
+                    screen_path = tmp.name
+                finder = KeyleFinderModule(screen_path)
                 result = finder.locate(item['path'], debug=debug)
                 if result.get('status') == 0:
                     tl = result['top_left']
@@ -75,12 +88,11 @@ def run_workflow(items, debug=False, loop=False, interval=0.5):
                         pyautogui.click(clicks=2)
                     elif item.get('action') == 'long':
                         pyautogui.mouseDown()
-                        time.sleep(1)
-                        pyautogui.mouseUp()
+                        long_press_active = True
+                        long_press_pos = pyautogui.position()
                     else:
                         pyautogui.click()
                     print(f'Item {idx} matched at {center_x},{center_y}')
-                    time.sleep(item.get('delay', 0) / 1000.0)
                     idx += 1
                 else:
                     print(f'Item {idx} match failed')
@@ -88,7 +100,10 @@ def run_workflow(items, debug=False, loop=False, interval=0.5):
                         idx = 0
                     else:
                         idx += 1
-            os.unlink(screen_path)
+                os.unlink(screen_path)
+            if long_press_active:
+                pyautogui.mouseUp()
+                long_press_active = False
             if not loop:
                 break
             time.sleep(interval)

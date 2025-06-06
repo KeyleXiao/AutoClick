@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo \
+          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo `
             opencv-python-headless numpy Pillow
       - name: Build EXE
         run: |
@@ -99,9 +99,9 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git pull --rebase
           git add README.md
           git commit -m "Update build links" || echo "No changes"
+          git pull --rebase
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

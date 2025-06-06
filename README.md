@@ -78,7 +78,7 @@ python cli_workflow.py workflow.json
 
 ## 中文简介
 
-AutoClick 是一个自动点击工具，通过配置模板图像来实现开发者自动化工作流程。
+AutoClick 是一个自动点击工具，通过配置模板图像来实现模拟人类点击屏幕的自动化工作流程。
 
 ### 功能
 

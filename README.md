@@ -110,3 +110,9 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现开发�
 ### 免责声明
 
 本工具旨在加速自动化调试，请勿将其用于任何非法用途。
+
+## Latest Build
+
+<!-- BUILD LINKS START -->
+链接更新中...
+<!-- BUILD LINKS END -->

@@ -1,18 +1,16 @@
-name: Build and Release EXE
+name: Build EXE
 
 on:
   push:
-    tags:
-      - 'v*'   # 当推送版本标签时触发
-  workflow_dispatch:  # 允许手动触发
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  build-exe:
+  build:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -21,50 +19,20 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install --upgrade pip
-        pip install pyinstaller
-        pip install pyautogui pandas openpyxl pillow
-        # 安装 pyautogui 的所有子依赖
-        pip install pyscreeze pytweening mouseinfo
-        
-        # 可选：如果使用 OpenCV 功能
-        # pip install opencv-python
+        pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo
 
-    - name: Build EXE with explicit imports
+    - name: Build EXE (PowerShell格式)
       run: |
-        pyinstaller --onefile --noconsole --name "GUI_Locator" ^
-          --hidden-import pyautogui ^
-          --hidden-import pyscreeze ^
-          --hidden-import pytweening ^
-          --hidden-import mouseinfo ^
-          --collect-data pyautogui ^
+        pyinstaller --onefile --noconsole --name "GUI_Locator" `
+          --hidden-import pyautogui `
+          --hidden-import pyscreeze `
+          --hidden-import pytweening `
+          --hidden-import mouseinfo `
+          --collect-data pyautogui `
           gui_locator_multi.py
-        
-        # 如果使用 OpenCV
-        # --hidden-import cv2
 
-    - name: Test the built EXE (重要!)
-      run: |
-        dist\GUI_Locator.exe --test 2>&1 | tee test-output.log
-        # 检查是否有错误
-        if (Select-String -Path test-output.log -Pattern "Error") {
-          exit 1
-        }
-
-    - name: Create Release
-      if: ${{ success() }}  # 只有测试通过才创建发布
-      uses: softprops/action-gh-release@v1
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: ${{ github.ref_name }}
-        name: "版本 ${{ github.ref_name }}"
-        body: |
-          GUI Locator 应用程序
-          ### 更新日志：
-          - 修复依赖打包问题
-          - 包含所有必需模块
-        draft: false
-        prerelease: false
-        files: |
-          dist/GUI_Locator.exe
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: GUI_Locator
+        path: dist/GUI_Locator.exe

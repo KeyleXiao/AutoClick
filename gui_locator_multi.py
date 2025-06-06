@@ -130,6 +130,9 @@ class App(tk.Tk):
         self.failsafe_var = tk.BooleanVar(value=True)
         self.hide_window_var = tk.BooleanVar(value=True)
         self.hotkey_var = tk.StringVar(value=HOTKEY)
+        self.long_press_active = False
+        self.long_press_pos = None
+        self.after(100, self.check_long_press)
 
         top = ttk.Frame(self)
         top.pack(fill='x', pady=5)
@@ -208,6 +211,12 @@ class App(tk.Tk):
     def copy_log(self, _):
         self.clipboard_clear()
         self.clipboard_append(self.log_label.cget('text'))
+
+    def check_long_press(self):
+        if self.long_press_active and pyautogui.position() != self.long_press_pos:
+            pyautogui.mouseUp()
+            self.long_press_active = False
+        self.after(100, self.check_long_press)
 
     def update_photo(self, idx):
         path = self.items[idx]['path']
@@ -483,48 +492,56 @@ class App(tk.Tk):
                 self.after(10, lambda: run_items(idx + 1))
                 return
 
-            item_id = self.tree.get_children()[idx]
-            self.tree.item(item_id, tags=('running',))
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-                screenshot = pyautogui.screenshot()
-                screenshot.save(tmp.name)
-                finder = KeyleFinderModule(tmp.name)
-                result = finder.locate(item['path'], debug=self.debug_var.get())
-            os.unlink(tmp.name)
+            if self.long_press_active:
+                pyautogui.mouseUp()
+                self.long_press_active = False
 
-            if result.get('status') == 0:
-                tl = result['top_left']
-                br = result['bottom_right']
-                width = br[0] - tl[0]
-                height = br[1] - tl[1]
-                offset = item.get('offset', [0.5, 0.5])
-                click_x = tl[0] + int(width * offset[0])
-                click_y = tl[1] + int(height * offset[1])
-                move_mouse(click_x, click_y)
-                if item.get('action') == 'double':
-                    pyautogui.click(clicks=2)
-                elif item.get('action') == 'long':
-                    pyautogui.mouseDown()
-                    time.sleep(1)
-                    pyautogui.mouseUp()
-                else:
-                    pyautogui.click()
-                tags = list(self.tree.item(item_id, 'tags'))
-                if 'running' in tags:
-                    tags.remove('running')
-                if 'fail' in tags:
-                    tags.remove('fail')
-                self.tree.item(item_id, tags=tuple(tags))
-                self.log(f'Item {idx} matched at {click_x},{click_y}')
-                delay = item.get('delay', 0) / 1000.0
-                self.after(int(delay * 1000), lambda: run_items(idx + 1))
-            else:
-                self.tree.item(item_id, tags=('fail',))
-                self.log(f'Item {idx} match failed')
-                if item.get('interrupt'):
-                    self.after(10, lambda: run_items(0))
-                else:
+            delay = item.get('delay', 0)
+
+            def execute():
+                item_id = self.tree.get_children()[idx]
+                self.tree.item(item_id, tags=('running',))
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+                    screenshot = pyautogui.screenshot()
+                    screenshot.save(tmp.name)
+                    finder = KeyleFinderModule(tmp.name)
+                    result = finder.locate(item['path'], debug=self.debug_var.get())
+                os.unlink(tmp.name)
+
+                if result.get('status') == 0:
+                    tl = result['top_left']
+                    br = result['bottom_right']
+                    width = br[0] - tl[0]
+                    height = br[1] - tl[1]
+                    offset = item.get('offset', [0.5, 0.5])
+                    click_x = tl[0] + int(width * offset[0])
+                    click_y = tl[1] + int(height * offset[1])
+                    move_mouse(click_x, click_y)
+                    if item.get('action') == 'double':
+                        pyautogui.click(clicks=2)
+                    elif item.get('action') == 'long':
+                        pyautogui.mouseDown()
+                        self.long_press_active = True
+                        self.long_press_pos = (click_x, click_y)
+                    else:
+                        pyautogui.click()
+                    tags = list(self.tree.item(item_id, 'tags'))
+                    if 'running' in tags:
+                        tags.remove('running')
+                    if 'fail' in tags:
+                        tags.remove('fail')
+                    self.tree.item(item_id, tags=tuple(tags))
+                    self.log(f'Item {idx} matched at {click_x},{click_y}')
                     self.after(10, lambda: run_items(idx + 1))
+                else:
+                    self.tree.item(item_id, tags=('fail',))
+                    self.log(f'Item {idx} match failed')
+                    if item.get('interrupt'):
+                        self.after(10, lambda: run_items(0))
+                    else:
+                        self.after(10, lambda: run_items(idx + 1))
+
+            self.after(delay, execute)
 
         self.tree.tag_configure('running', background='lightgreen')
         self.tree.tag_configure('fail', background='lightcoral')

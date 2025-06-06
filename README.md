@@ -2,6 +2,10 @@
 
 AutoClick provides a simple way to locate a template image inside a bigger screenshot and automate mouse actions. It includes a command line example and a small GUI for managing multiple templates.
 
+## Project Background
+
+AutoClick was inspired by my other open source project KeyleFinder. It was created to accelerate automated debugging workflows. Many thanks to CodeX for the wonderful collaboration.
+
 ## Features
 
 - ORB based feature matching with a template fallback
@@ -89,3 +93,18 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现开发�
 1. `python KeyleFinderModuleTest.py`运行测试
 2. `python gui_locator_multi.py`启动图形界面
 3. `python cli_workflow.py workflow.json`从命令行执行工作流程
+
+### 操作步骤
+
+1. 克隆本仓库并安装依赖：
+   ```bash
+   pip install opencv-python-headless numpy Pillow pyautogui keyboard pynput pyobjc-core pyobjc
+   ```
+2. 运行 `python KeyleFinderModuleTest.py` 体验基础功能。
+3. 执行 `python gui_locator_multi.py` 打开界面，添加模板并配置热键。
+4. 按下配置的热键（默认 `F2`）进行匹配。
+5. 需要批量操作时，可运行 `python cli_workflow.py workflow.json`。
+
+### 免责声明
+
+本工具旨在加速自动化调试，请勿将其用于任何非法用途。

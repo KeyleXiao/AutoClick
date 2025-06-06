@@ -6,33 +6,35 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: windows-latest  # 必须使用 Windows 环境打包 EXE
+  build-exe:
+    runs-on: windows-latest
+    timeout-minutes: 30  # 增加超时时间
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.11'  # 推荐使用更新的 Python 版本
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        # 添加你的其他依赖（根据 requirements.txt 或手动指定）
-        pip install pandas openpyxl pillow  # 示例依赖
+        pip install pyinstaller pandas openpyxl pillow
+        # 使用 requirements.txt 更佳
+        # pip install -r requirements.txt
 
     - name: Build EXE with PyInstaller
       run: |
         pyinstaller --onefile --noconsole --name "GUI_Locator" gui_locator_multi.py
-        # 可选：添加图标 --icon=app.ico
-        # 可选：添加数据文件 --add-data "assets;assets"
+        # 如需添加资源文件
+        # pyinstaller --onefile --noconsole --add-data "assets/*;assets" --name "GUI_Locator" gui_locator_multi.py
 
-    - name: Archive EXE artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload EXE artifact
+      uses: actions/upload-artifact@v4  # 使用最新 v4 版本
       with:
         name: gui-locator-exe
         path: dist/GUI_Locator.exe
+        retention-days: 7  # 自动清理旧构建

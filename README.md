@@ -2,6 +2,8 @@
 
 AutoClick provides a simple way to locate a template image inside a bigger screenshot and automate mouse actions. It includes a command line example and a small GUI for managing multiple templates.
 
+![](desc.png)
+
 ## Project Background
 
 AutoClick was inspired by my other open source project KeyleFinder. It was created to accelerate automated debugging workflows. Many thanks to CodeX for the wonderful collaboration.

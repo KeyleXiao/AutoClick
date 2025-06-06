@@ -67,9 +67,6 @@ def run_workflow(items, debug=False, loop=False, interval=0.5):
                         pyautogui.mouseUp()
                         long_press_active = False
 
-                delay = item.get('delay', 0) / 1000.0
-                time.sleep(delay)
-
                 if long_press_active and item.get('action') != 'long':
                     pyautogui.mouseUp()
                     long_press_active = False
@@ -103,6 +100,8 @@ def run_workflow(items, debug=False, loop=False, interval=0.5):
                     else:
                         idx += 1
                 os.unlink(screen_path)
+                delay = item.get('delay', 0) / 1000.0
+                time.sleep(delay)
             if long_press_active:
                 pyautogui.mouseUp()
                 long_press_active = False

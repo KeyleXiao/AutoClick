@@ -107,6 +107,10 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现模拟�
 4. 按下配置的热键（默认 `F2`）进行匹配。
 5. 需要批量操作时，可运行 `python cli_workflow.py workflow.json`。
 
+### Test/测试
+[](interacitonTest.png)
+[test site/测试站点](https://test.vrast.cn/index.html)
+
 ### 免责声明
 
 本工具旨在加速自动化调试，请勿将其用于任何非法用途。

@@ -1,14 +1,14 @@
-name: Build EXE
+name: Build and Release EXE
 
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
+    tags:
+      - 'v*'   # 当推送版本标签时触发
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   build-exe:
     runs-on: windows-latest
-    timeout-minutes: 30  # 增加超时时间
 
     steps:
     - name: Checkout code
@@ -17,24 +17,54 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11'  # 推荐使用更新的 Python 版本
+        python-version: '3.11'
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller pandas openpyxl pillow
-        # 使用 requirements.txt 更佳
-        # pip install -r requirements.txt
+        pip install --upgrade pip
+        pip install pyinstaller
+        pip install pyautogui pandas openpyxl pillow
+        # 安装 pyautogui 的所有子依赖
+        pip install pyscreeze pytweening mouseinfo
+        
+        # 可选：如果使用 OpenCV 功能
+        # pip install opencv-python
 
-    - name: Build EXE with PyInstaller
+    - name: Build EXE with explicit imports
       run: |
-        pyinstaller --onefile --noconsole --name "GUI_Locator" gui_locator_multi.py
-        # 如需添加资源文件
-        # pyinstaller --onefile --noconsole --add-data "assets/*;assets" --name "GUI_Locator" gui_locator_multi.py
+        pyinstaller --onefile --noconsole --name "GUI_Locator" ^
+          --hidden-import pyautogui ^
+          --hidden-import pyscreeze ^
+          --hidden-import pytweening ^
+          --hidden-import mouseinfo ^
+          --collect-data pyautogui ^
+          gui_locator_multi.py
+        
+        # 如果使用 OpenCV
+        # --hidden-import cv2
 
-    - name: Upload EXE artifact
-      uses: actions/upload-artifact@v4  # 使用最新 v4 版本
+    - name: Test the built EXE (重要!)
+      run: |
+        dist\GUI_Locator.exe --test 2>&1 | tee test-output.log
+        # 检查是否有错误
+        if (Select-String -Path test-output.log -Pattern "Error") {
+          exit 1
+        }
+
+    - name: Create Release
+      if: ${{ success() }}  # 只有测试通过才创建发布
+      uses: softprops/action-gh-release@v1
       with:
-        name: gui-locator-exe
-        path: dist/GUI_Locator.exe
-        retention-days: 7  # 自动清理旧构建
+        tag_name: ${{ github.ref_name }}
+        name: "版本 ${{ github.ref_name }}"
+        body: |
+          GUI Locator 应用程序
+          ### 更新日志：
+          - 修复依赖打包问题
+          - 包含所有必需模块
+        draft: false
+        prerelease: false
+        files: |
+          dist/GUI_Locator.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

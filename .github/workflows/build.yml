@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: |
-          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo \
+          pip install pyinstaller pyautogui pyscreeze pytweening mouseinfo `
             opencv-python-headless numpy Pillow
       - name: Build EXE
         run: |

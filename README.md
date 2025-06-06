@@ -113,6 +113,7 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现开发�
 
 ## Latest Build
 
-<!-- BUILD LINKS START -->
-链接更新中...
+\n<!-- BUILD LINKS START -->
+- [Windows](https://github.com/KeyleXiao/AutoClick/releases/download//GUI_Locator.exe)
+- [macOS](https://github.com/KeyleXiao/AutoClick/releases/download//GUI_Locator)
 <!-- BUILD LINKS END -->

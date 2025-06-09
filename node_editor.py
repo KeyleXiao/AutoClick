@@ -1,18 +1,27 @@
 import tkinter as tk
-from tkinter import simpledialog
+from tkinter import simpledialog, messagebox
 import os
 
+RUNNING_COLOR = '#c8ffd4'
+FAIL_COLOR = '#ffb3b3'
+
 class Edge:
-    def __init__(self, editor, src, dst):
+    def __init__(self, editor, src, dst, port_type='default'):
         self.editor = editor
         self.src = src
         self.dst = dst
-        sx, sy = src.output_position()
+        self.port_type = port_type
+        color = '#555'
+        if port_type == 'success':
+            color = '#0a0'
+        elif port_type == 'failure':
+            color = '#a00'
+        sx, sy = src.output_position(port_type)
         dx, dy = dst.input_position()
-        self.line = editor.canvas.create_line(sx, sy, dx, dy, arrow=tk.LAST, fill='#555')
+        self.line = editor.canvas.create_line(sx, sy, dx, dy, arrow=tk.LAST, fill=color)
 
     def update(self):
-        sx, sy = self.src.output_position()
+        sx, sy = self.src.output_position(self.port_type)
         dx, dy = self.dst.input_position()
         self.editor.canvas.coords(self.line, sx, sy, dx, dy)
 
@@ -23,14 +32,16 @@ class Node:
     def __init__(self, editor, item, x=50, y=50):
         self.editor = editor
         self.item = item
+        self.type = item.get('type', 'normal')
         self.x = x
         self.y = y
+        self.normal_color = '#f5f5f5'
         self.rect = editor.canvas.create_rectangle(
             x,
             y,
             x + self.WIDTH,
             y + self.HEIGHT,
-            fill='#f5f5f5',
+            fill=self.normal_color,
             outline='#333',
             width=2,
         )
@@ -42,20 +53,48 @@ class Node:
         self.in_port = editor.canvas.create_oval(
             x - 6, y + self.HEIGHT / 2 - 6, x + 6, y + self.HEIGHT / 2 + 6, fill='#333'
         )
-        self.out_port = editor.canvas.create_oval(
-            x + self.WIDTH - 6,
-            y + self.HEIGHT / 2 - 6,
-            x + self.WIDTH + 6,
-            y + self.HEIGHT / 2 + 6,
-            fill='#333',
-        )
+        if self.type == 'condition':
+            self.out_port_success = editor.canvas.create_oval(
+                x + self.WIDTH - 6,
+                y + self.HEIGHT / 3 - 6,
+                x + self.WIDTH + 6,
+                y + self.HEIGHT / 3 + 6,
+                fill='#0a0',
+            )
+            self.out_port_failure = editor.canvas.create_oval(
+                x + self.WIDTH - 6,
+                y + 2 * self.HEIGHT / 3 - 6,
+                x + self.WIDTH + 6,
+                y + 2 * self.HEIGHT / 3 + 6,
+                fill='#a00',
+            )
+        else:
+            self.out_port = editor.canvas.create_oval(
+                x + self.WIDTH - 6,
+                y + self.HEIGHT / 2 - 6,
+                x + self.WIDTH + 6,
+                y + self.HEIGHT / 2 + 6,
+                fill='#333',
+            )
 
         for item_id in [self.rect, self.text, self.act_text]:
             editor.canvas.tag_bind(item_id, '<ButtonPress-1>', self.on_press)
             editor.canvas.tag_bind(item_id, '<B1-Motion>', self.on_drag)
             editor.canvas.tag_bind(item_id, '<ButtonRelease-1>', self.on_release)
             editor.canvas.tag_bind(item_id, '<Double-1>', self.edit)
-        editor.canvas.tag_bind(self.out_port, '<ButtonPress-1>', self.start_link)
+        if self.type == 'condition':
+            editor.canvas.tag_bind(
+                self.out_port_success,
+                '<ButtonPress-1>',
+                lambda e: self.start_link(e, 'success')
+            )
+            editor.canvas.tag_bind(
+                self.out_port_failure,
+                '<ButtonPress-1>',
+                lambda e: self.start_link(e, 'failure')
+            )
+        else:
+            editor.canvas.tag_bind(self.out_port, '<ButtonPress-1>', self.start_link)
         editor.canvas.tag_bind(self.in_port, '<ButtonRelease-1>', self.finish_link)
         self.drag_data = None
         self.in_edges = []
@@ -66,7 +105,11 @@ class Node:
     def move(self, dx, dy):
         self.x += dx
         self.y += dy
-        items = [self.rect, self.text, self.act_text, self.in_port, self.out_port]
+        items = [self.rect, self.text, self.act_text, self.in_port]
+        if self.type == 'condition':
+            items.extend([self.out_port_success, self.out_port_failure])
+        else:
+            items.append(self.out_port)
         for item in items:
             self.editor.canvas.move(item, dx, dy)
         for e in self.in_edges + self.out_edges:
@@ -94,8 +137,8 @@ class Node:
             self.drag_data = (event.x, event.y)
             self.move(dx, dy)
 
-    def start_link(self, event):
-        self.editor.start_connection(self, event.x, event.y)
+    def start_link(self, event, port_type='default'):
+        self.editor.start_connection(self, port_type, event.x, event.y)
 
     def finish_link(self, event):
         self.editor.finish_connection(self)
@@ -110,8 +153,8 @@ class Node:
 
     def start_long_link(self):
         self._press_job = None
-        x, y = self.output_position()
-        self.editor.start_connection(self, x, y)
+        x, y = self.output_position('default')
+        self.editor.start_connection(self, 'default', x, y)
 
     def edit(self, event=None):
         action = simpledialog.askstring('Action', 'action', initialvalue=self.item.get('action', 'single'), parent=self.editor.master)
@@ -122,8 +165,22 @@ class Node:
     def input_position(self):
         return self.x, self.y + self.HEIGHT/2
 
-    def output_position(self):
+    def output_position(self, port_type='default'):
+        if self.type == 'condition':
+            if port_type == 'success':
+                return self.x + self.WIDTH, self.y + self.HEIGHT/3
+            elif port_type == 'failure':
+                return self.x + self.WIDTH, self.y + 2 * self.HEIGHT/3
         return self.x + self.WIDTH, self.y + self.HEIGHT/2
+
+    def highlight_running(self):
+        self.editor.canvas.itemconfigure(self.rect, fill=RUNNING_COLOR)
+
+    def highlight_fail(self):
+        self.editor.canvas.itemconfigure(self.rect, fill=FAIL_COLOR)
+
+    def clear_highlight(self):
+        self.editor.canvas.itemconfigure(self.rect, fill=self.normal_color)
 
 class NodeEditor(tk.Frame):
     def __init__(self, master, items, on_apply=None):
@@ -132,16 +189,36 @@ class NodeEditor(tk.Frame):
         self.items = items
         self.on_apply = on_apply
         self.master.protocol('WM_DELETE_WINDOW', self.close)
+        toolbar = tk.Frame(self)
+        toolbar.pack(fill='x')
+        tk.Button(toolbar, text='Add Node', command=self.add_node).pack(side='left')
         self.canvas = tk.Canvas(self, bg='white')
         self.canvas.pack(fill='both', expand=True)
         self.nodes = []
+        self.item_to_node = {}
         self.edges = []
         self.temp_line = None
         self.start_node = None
         for i, item in enumerate(items):
             node = Node(self, item, x=60 + i*160, y=60)
             self.nodes.append(node)
+            self.item_to_node[item] = node
         self.pack(fill='both', expand=True)
+
+    def add_node(self):
+        node_type = simpledialog.askstring(
+            'Node Type', 'Type (normal/condition):', parent=self.master
+        )
+        if not node_type:
+            return
+        node_type = node_type.lower()
+        if node_type not in ('normal', 'condition'):
+            messagebox.showerror('Error', 'Invalid node type')
+            return
+        item = {'type': node_type}
+        node = Node(self, item, x=60, y=60)
+        self.nodes.append(node)
+        self.item_to_node[item] = node
 
     def close(self):
         if self.on_apply:
@@ -173,8 +250,24 @@ class NodeEditor(tk.Frame):
         order.reverse()
         return [n.item for n in order]
 
-    def start_connection(self, node, x, y):
+    def highlight_running(self, item):
+        node = self.item_to_node.get(item)
+        if node:
+            node.highlight_running()
+
+    def highlight_fail(self, item):
+        node = self.item_to_node.get(item)
+        if node:
+            node.highlight_fail()
+
+    def clear_highlight(self, item):
+        node = self.item_to_node.get(item)
+        if node:
+            node.clear_highlight()
+
+    def start_connection(self, node, port_type, x, y):
         self.start_node = node
+        self.start_port_type = port_type
         self.temp_line = self.canvas.create_line(x, y, x, y, dash=(4, 2))
         self.canvas.bind('<Motion>', self.track_temp)
 
@@ -185,7 +278,7 @@ class NodeEditor(tk.Frame):
 
     def finish_connection(self, node=None):
         if self.start_node and node and self.start_node != node:
-            edge = Edge(self, self.start_node, node)
+            edge = Edge(self, self.start_node, node, self.start_port_type)
             self.edges.append(edge)
             self.start_node.out_edges.append(edge)
             node.in_edges.append(edge)
@@ -193,6 +286,7 @@ class NodeEditor(tk.Frame):
             self.canvas.delete(self.temp_line)
         self.temp_line = None
         self.start_node = None
+        self.start_port_type = None
         self.canvas.unbind('<Motion>')
 
 def main():

@@ -19,18 +19,30 @@ if sys.platform == 'darwin':
     class _MacHotkey:
         def __init__(self):
             self._listener = None
+            self._hotkeys = {}
 
-        def add_hotkey(self, key, callback):
+        def _restart(self):
             if self._listener:
                 self._listener.stop()
-            hotkey = f'<{key.lower()}>'
-            self._listener = _pynput_keyboard.GlobalHotKeys({hotkey: callback})
-            self._listener.start()
+            if self._hotkeys:
+                self._listener = _pynput_keyboard.GlobalHotKeys(self._hotkeys)
+                self._listener.start()
+            else:
+                self._listener = None
+
+        def add_hotkey(self, key, callback):
+            self._hotkeys[f'<{key.lower()}>'] = callback
+            self._restart()
+
+        def remove_hotkey(self, key):
+            self._hotkeys.pop(f'<{key.lower()}>', None)
+            self._restart()
 
         def clear_all_hotkeys(self):
             if self._listener:
                 self._listener.stop()
                 self._listener = None
+            self._hotkeys = {}
 
     keyboard = _MacHotkey()
 else:
@@ -133,6 +145,9 @@ class App(tk.Tk):
         self.long_press_active = False
         self.long_press_pos = None
         self.after(100, self.check_long_press)
+        self.running = False
+        self.run_after_id = None
+        self.finish_search_func = None
 
         top = ttk.Frame(self)
         top.pack(fill='x', pady=5)
@@ -140,8 +155,17 @@ class App(tk.Tk):
         add_btn = ttk.Button(top, text='➕', width=3, command=self.add_item)
         add_btn.pack(side='left', padx=2)
 
-        start_btn = ttk.Button(top, text='▶', width=3, command=self.trigger_search)
+        start_btn = ttk.Button(top, text='▶', width=3, command=self.toggle_search)
         start_btn.pack(side='left', padx=2)
+
+        copy_btn = ttk.Button(top, text='⧉', width=3, command=self.copy_item)
+        copy_btn.pack(side='left', padx=2)
+
+        up_btn = ttk.Button(top, text='▲', width=3, command=self.move_item_up)
+        up_btn.pack(side='left', padx=2)
+
+        down_btn = ttk.Button(top, text='▼', width=3, command=self.move_item_down)
+        down_btn.pack(side='left', padx=2)
 
         del_btn = ttk.Button(top, text='🗑', width=3, command=self.delete_item)
         del_btn.pack(side='left', padx=2)
@@ -196,7 +220,8 @@ class App(tk.Tk):
         self.hotkey_available = False
         if keyboard:
             try:
-                keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
+                keyboard.add_hotkey(self.hotkey_var.get(), self.toggle_search)
+                keyboard.add_hotkey('esc', self.stop_search)
                 self.hotkey_available = True
             except Exception:
                 print('Warning: global hotkeys are unavailable')
@@ -401,11 +426,64 @@ class App(tk.Tk):
             self.current_index = None
             self.photo_label.config(image='', text='No Image')
 
+    def copy_item(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('Info', 'Select an item to copy')
+            return
+        idx = self.tree.index(sel[0])
+        src = self.items[idx]
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+            with open(src['path'], 'rb') as f:
+                tmp.write(f.read())
+            new_path = tmp.name
+        item = src.copy()
+        item['path'] = new_path
+        self.items.insert(idx + 1, item)
+        self.tree.insert('', idx + 1, text=os.path.basename(new_path), values=('', '', '', ''))
+        self.refresh_tree_row(idx + 1)
+        self.tree.selection_set(self.tree.get_children()[idx + 1])
+        self.current_index = idx + 1
+        self.update_photo(idx + 1)
+
+    def move_item_up(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('Info', 'Select an item to move')
+            return
+        idx = self.tree.index(sel[0])
+        if idx == 0:
+            return
+        self.items[idx - 1], self.items[idx] = self.items[idx], self.items[idx - 1]
+        item_id = self.tree.get_children()[idx]
+        self.tree.move(item_id, '', idx - 1)
+        self.refresh_tree_row(idx - 1)
+        self.refresh_tree_row(idx)
+        self.tree.selection_set(self.tree.get_children()[idx - 1])
+        self.current_index = idx - 1
+
+    def move_item_down(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showinfo('Info', 'Select an item to move')
+            return
+        idx = self.tree.index(sel[0])
+        if idx >= len(self.items) - 1:
+            return
+        self.items[idx + 1], self.items[idx] = self.items[idx], self.items[idx + 1]
+        item_id = self.tree.get_children()[idx]
+        self.tree.move(item_id, '', idx + 1)
+        self.refresh_tree_row(idx)
+        self.refresh_tree_row(idx + 1)
+        self.tree.selection_set(self.tree.get_children()[idx + 1])
+        self.current_index = idx + 1
+
     def update_hotkey(self, *_):
         if not getattr(self, 'hotkey_available', False):
             return
         keyboard.clear_all_hotkeys()
-        keyboard.add_hotkey(self.hotkey_var.get(), self.trigger_search)
+        keyboard.add_hotkey(self.hotkey_var.get(), self.toggle_search)
+        keyboard.add_hotkey('esc', self.stop_search)
 
     def update_failsafe(self, *_):
         pyautogui.FAILSAFE = self.failsafe_var.get()
@@ -442,7 +520,27 @@ class App(tk.Tk):
         style = ttk.Style(win)
         style.configure('Danger.TCheckbutton', foreground='red')
 
+    def toggle_search(self, *_):
+        if self.running:
+            self.stop_search()
+        else:
+            self.trigger_search()
+
+    def stop_search(self, *_):
+        if not self.running:
+            return
+        if self.run_after_id:
+            self.after_cancel(self.run_after_id)
+            self.run_after_id = None
+        if self.long_press_active:
+            pyautogui.mouseUp()
+            self.long_press_active = False
+        if self.finish_search_func:
+            self.finish_search_func()
+
     def trigger_search(self, start_idx=None):
+        if self.running:
+            return
         if not self.items:
             messagebox.showwarning('Warning', 'Add item first')
             return
@@ -469,6 +567,7 @@ class App(tk.Tk):
         orig_image = getattr(self.photo_label, 'image', None)
         orig_text = self.photo_label.cget('text')
         self.photo_label.config(image='', text='')
+        self.running = True
 
         def finish_search():
             if hide_window:
@@ -478,6 +577,9 @@ class App(tk.Tk):
                 self.photo_label.image = orig_image
             else:
                 self.photo_label.config(image='', text=orig_text)
+            self.running = False
+            self.run_after_id = None
+            self.finish_search_func = None
 
         def run_items(idx=0):
             if idx >= len(self.items):
@@ -485,7 +587,7 @@ class App(tk.Tk):
                     pyautogui.mouseUp()
                     self.long_press_active = False
                 if self.loop_var.get():
-                    self.after(500, lambda: run_items(0))
+                    self.run_after_id = self.after(500, lambda: run_items(0))
                 else:
                     finish_search()
                 return
@@ -541,14 +643,15 @@ class App(tk.Tk):
                         next_idx = 0
 
                 delay = item.get('delay', 0)
-                self.after(delay, lambda: run_items(next_idx))
+                self.run_after_id = self.after(delay, lambda: run_items(next_idx))
 
             execute()
 
         self.tree.tag_configure('running', background='lightgreen')
         self.tree.tag_configure('fail', background='lightcoral')
 
-        self.after(100, lambda: run_items(start_idx))
+        self.finish_search_func = finish_search
+        self.run_after_id = self.after(100, lambda: run_items(start_idx))
 
     def on_close(self):
         if getattr(self, 'hotkey_available', False):

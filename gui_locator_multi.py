@@ -196,6 +196,9 @@ class App(tk.Tk):
         setting_btn = ttk.Button(top, text='⚙', width=3, command=self.open_settings)
         setting_btn.pack(side='left', padx=2)
 
+        node_btn = ttk.Button(top, text='Nodes', command=self.open_node_editor)
+        node_btn.pack(side='left', padx=2)
+
         about_btn = ttk.Button(top, text='About', command=self.show_about)
         about_btn.pack(side='right', padx=5)
 
@@ -313,6 +316,23 @@ class App(tk.Tk):
         self.tree.set(item_id, 'delay', str(item.get('delay', 0)))
         self.tree.set(item_id, 'interrupt', '✔' if item.get('interrupt') else '')
         self.tree.set(item_id, 'enable', '✔' if item.get('enable', True) else '')
+
+    def refresh_tree(self):
+        self.tree.delete(*self.tree.get_children())
+        for item in self.items:
+            self.tree.insert('', 'end', text=os.path.basename(item['path']), values=('', '', '', ''))
+        for i in range(len(self.items)):
+            self.refresh_tree_row(i)
+
+    def apply_node_order(self, ordered_items):
+        if not ordered_items:
+            return
+        self.items = ordered_items
+        self.refresh_tree()
+        self.current_index = 0
+        if self.tree.get_children():
+            self.tree.selection_set(self.tree.get_children()[0])
+            self.update_photo(0)
 
     def on_tree_double_click(self, event):
         item_id = self.tree.identify_row(event.y)
@@ -507,6 +527,17 @@ class App(tk.Tk):
 
     def show_about(self):
         messagebox.showinfo('About', 'KeyleFinder\nAuthor: keyle\nhttps://vrast.cn')
+
+    def open_node_editor(self):
+        try:
+            from node_editor import NodeEditor
+        except Exception as e:
+            messagebox.showerror('Error', f'Failed to load node editor: {e}')
+            return
+        win = tk.Toplevel(self)
+        win.title('Workflow Nodes')
+        win.geometry('800x600')
+        NodeEditor(win, self.items, self.apply_node_order)
 
     def open_settings(self):
         win = tk.Toplevel(self)

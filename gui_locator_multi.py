@@ -64,6 +64,13 @@ else:
 HOTKEY = 'F2'
 HOTKEY_OPTIONS = [f'F{i}' for i in range(1, 13)]
 
+# Dopamine inspired color scheme
+BG_COLOR = '#f9f6ff'
+ACCENT_COLOR = '#ff6bcb'
+ACCENT_HOVER = '#ff87d2'
+RUNNING_COLOR = '#c8ffd4'
+FAIL_COLOR = '#ffb3b3'
+
 
 class ScreenCropper(tk.Toplevel):
     def __init__(self, master, screenshot, callback):
@@ -130,10 +137,20 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('Multi Locator')
-        self.geometry('600x600')
+        self.geometry('800x600')
         self.resizable(False, False)
 
-        ttk.Style(self).theme_use('clam')
+        style = ttk.Style(self)
+        style.theme_use('clam')
+        style.configure('TFrame', background=BG_COLOR)
+        style.configure('TLabel', background=BG_COLOR)
+        style.configure('TCheckbutton', background=BG_COLOR)
+        style.configure('TButton', background=ACCENT_COLOR, foreground='white', relief='flat')
+        style.map('TButton', background=[('active', ACCENT_HOVER)])
+        style.configure('Treeview', background='white', fieldbackground='white', foreground='#333')
+        style.map('Treeview', background=[('selected', ACCENT_COLOR)])
+
+        self.configure(background=BG_COLOR)
 
         self.items = []  # each item is a dict with action, delay etc
         self.debug_var = tk.BooleanVar(value=False)
@@ -495,6 +512,7 @@ class App(tk.Tk):
         win = tk.Toplevel(self)
         win.title('Settings')
         win.resizable(False, False)
+        win.configure(background=BG_COLOR)
         ttk.Checkbutton(win, text='Debug', variable=self.debug_var).pack(anchor='w', padx=10, pady=(5, 0))
         ttk.Label(win, text='调试模式，显示匹配结果').pack(anchor='w', padx=30, pady=(0, 5))
 
@@ -518,7 +536,7 @@ class App(tk.Tk):
         ttk.Label(win, text='触发搜索的快捷键').pack(anchor='w', padx=30, pady=(0, 5))
         ttk.Button(win, text='Close', command=win.destroy).pack(pady=10)
         style = ttk.Style(win)
-        style.configure('Danger.TCheckbutton', foreground='red')
+        style.configure('Danger.TCheckbutton', foreground='red', background=BG_COLOR)
 
     def toggle_search(self, *_):
         if self.running:
@@ -647,8 +665,8 @@ class App(tk.Tk):
 
             execute()
 
-        self.tree.tag_configure('running', background='lightgreen')
-        self.tree.tag_configure('fail', background='lightcoral')
+        self.tree.tag_configure('running', background=RUNNING_COLOR)
+        self.tree.tag_configure('fail', background=FAIL_COLOR)
 
         self.finish_search_func = finish_search
         self.run_after_id = self.after(100, lambda: run_items(start_idx))

@@ -537,7 +537,12 @@ class App(tk.Tk):
         win = tk.Toplevel(self)
         win.title('Workflow Nodes')
         win.geometry('800x600')
-        NodeEditor(win, self.items, self.apply_node_order)
+        self.node_editor = NodeEditor(win, self.items, self.apply_node_order)
+        def on_close():
+            if hasattr(self, 'node_editor'):
+                self.node_editor.close()
+                self.node_editor = None
+        win.protocol('WM_DELETE_WINDOW', on_close)
 
     def open_settings(self):
         win = tk.Toplevel(self)
@@ -653,6 +658,8 @@ class App(tk.Tk):
 
                 item_id = self.tree.get_children()[idx]
                 self.tree.item(item_id, tags=('running',))
+                if getattr(self, 'node_editor', None) and self.node_editor.winfo_exists():
+                    self.node_editor.highlight_running(item)
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
                     screenshot = pyautogui.screenshot()
                     screenshot.save(tmp.name)
@@ -684,9 +691,13 @@ class App(tk.Tk):
                     if 'fail' in tags:
                         tags.remove('fail')
                     self.tree.item(item_id, tags=tuple(tags))
+                    if getattr(self, 'node_editor', None) and self.node_editor.winfo_exists():
+                        self.node_editor.clear_highlight(item)
                     self.log(f'Item {idx} matched at {click_x},{click_y}')
                 else:
                     self.tree.item(item_id, tags=('fail',))
+                    if getattr(self, 'node_editor', None) and self.node_editor.winfo_exists():
+                        self.node_editor.highlight_fail(item)
                     self.log(f'Item {idx} match failed')
                     if item.get('interrupt'):
                         next_idx = 0

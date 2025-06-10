@@ -1,6 +1,8 @@
 import tkinter as tk
-from tkinter import simpledialog, messagebox
+from tkinter import simpledialog, messagebox, ttk
 import os
+from copy import deepcopy
+from PIL import Image, ImageTk
 
 RUNNING_COLOR = '#c8ffd4'
 FAIL_COLOR = '#ffb3b3'
@@ -26,8 +28,8 @@ class Edge:
         self.editor.canvas.coords(self.line, sx, sy, dx, dy)
 
 class Node:
-    WIDTH = 140
-    HEIGHT = 70
+    WIDTH = 200
+    HEIGHT = 120
 
     def __init__(self, editor, item, x=50, y=50):
         self.editor = editor
@@ -46,9 +48,18 @@ class Node:
             width=2,
         )
         name = os.path.basename(item.get('path', 'Node'))
-        self.text = editor.canvas.create_text(x + self.WIDTH / 2, y + 20, text=name)
+        self.text = editor.canvas.create_text(x + self.WIDTH / 2, y + 10, text=name, anchor='n')
+        img_path = item.get('path')
+        self.image = None
+        self.image_id = None
+        if img_path and os.path.exists(img_path):
+            img = Image.open(img_path)
+            img.thumbnail((self.WIDTH - 20, self.HEIGHT - 50))
+            self.image = ImageTk.PhotoImage(img)
+            self.image_id = editor.canvas.create_image(x + self.WIDTH / 2, y + self.HEIGHT / 2, image=self.image)
         self.act_text = editor.canvas.create_text(
-            x + self.WIDTH / 2, y + 45, text=item.get('action', 'single')
+            x + self.WIDTH / 2, y + self.HEIGHT - 10,
+            text=item.get('action', 'single'), anchor='s'
         )
         self.in_port = editor.canvas.create_oval(
             x - 6, y + self.HEIGHT / 2 - 6, x + 6, y + self.HEIGHT / 2 + 6, fill='#333'
@@ -106,6 +117,8 @@ class Node:
         self.x += dx
         self.y += dy
         items = [self.rect, self.text, self.act_text, self.in_port]
+        if self.image_id:
+            items.append(self.image_id)
         if self.type == 'condition':
             items.extend([self.out_port_success, self.out_port_failure])
         else:
@@ -116,6 +129,7 @@ class Node:
             e.update()
 
     def on_press(self, event):
+        self.editor.select_node(self)
         self.drag_data = (event.x, event.y)
         self._moved = False
         if self._press_job:
@@ -157,10 +171,22 @@ class Node:
         self.editor.start_connection(self, 'default', x, y)
 
     def edit(self, event=None):
-        action = simpledialog.askstring('Action', 'action', initialvalue=self.item.get('action', 'single'), parent=self.editor.master)
+        action = simpledialog.askstring(
+            'Action',
+            'click type: single/double/long/right_single/right_double/right_long',
+            initialvalue=self.item.get('action', 'single'),
+            parent=self.editor.master,
+        )
         if action:
             self.item['action'] = action
             self.editor.canvas.itemconfigure(self.act_text, text=action)
+        delay = simpledialog.askinteger(
+            'Delay', 'delay(ms)', initialvalue=self.item.get('delay', 0), parent=self.editor.master
+        )
+        if delay is not None:
+            self.item['delay'] = delay
+        interrupt = messagebox.askyesno('Interrupt', 'interrupt on fail?', parent=self.editor.master)
+        self.item['interrupt'] = interrupt
 
     def input_position(self):
         return self.x, self.y + self.HEIGHT/2
@@ -192,13 +218,24 @@ class NodeEditor(tk.Frame):
         toolbar = tk.Frame(self)
         toolbar.pack(fill='x')
         tk.Button(toolbar, text='Add Node', command=self.add_node).pack(side='left')
+        tk.Button(toolbar, text='Copy', command=self.copy_node).pack(side='left')
+        tk.Button(toolbar, text='Paste', command=self.paste_node).pack(side='left')
+        tk.Button(toolbar, text='Delete', command=self.delete_node).pack(side='left')
         self.canvas = tk.Canvas(self, bg='white')
         self.canvas.pack(fill='both', expand=True)
+        zoom_frame = tk.Frame(self)
+        zoom_frame.pack(fill='x', side='bottom')
+        tk.Label(zoom_frame, text='Zoom').pack(side='left')
+        self.zoom_var = tk.DoubleVar(value=1.0)
+        self._last_zoom = 1.0
+        ttk.Scale(zoom_frame, from_=0.5, to=2.0, variable=self.zoom_var, command=self.on_zoom).pack(side='right', fill='x', expand=True)
         self.nodes = []
         self.item_to_node = {}
         self.edges = []
         self.temp_line = None
         self.start_node = None
+        self.selected_node = None
+        self.clipboard = None
         for i, item in enumerate(items):
             node = Node(self, item, x=60 + i*160, y=60)
             self.nodes.append(node)
@@ -219,6 +256,54 @@ class NodeEditor(tk.Frame):
         node = Node(self, item, x=60, y=60)
         self.nodes.append(node)
         self.item_to_node[item] = node
+
+    def select_node(self, node):
+        if self.selected_node and self.selected_node is not node:
+            self.canvas.itemconfigure(self.selected_node.rect, outline='#333')
+        self.selected_node = node
+        self.canvas.itemconfigure(node.rect, outline='#ff6bcb')
+
+    def copy_node(self):
+        if self.selected_node:
+            self.clipboard = deepcopy(self.selected_node.item)
+
+    def paste_node(self):
+        if not self.clipboard:
+            return
+        item = deepcopy(self.clipboard)
+        node = Node(self, item, x=60, y=60)
+        self.nodes.append(node)
+        self.item_to_node[item] = node
+
+    def delete_node(self):
+        node = self.selected_node
+        if not node:
+            return
+        for e in node.in_edges + node.out_edges:
+            self.canvas.delete(e.line)
+            if e in self.edges:
+                self.edges.remove(e)
+            if e.src is not node and e in e.src.out_edges:
+                e.src.out_edges.remove(e)
+            if e.dst is not node and e in e.dst.in_edges:
+                e.dst.in_edges.remove(e)
+        items = [node.rect, node.text, node.act_text, node.in_port]
+        if node.image_id:
+            items.append(node.image_id)
+        if node.type == 'condition':
+            items.extend([node.out_port_success, node.out_port_failure])
+        else:
+            items.append(node.out_port)
+        for itm in items:
+            self.canvas.delete(itm)
+        self.nodes.remove(node)
+        self.item_to_node.pop(node.item, None)
+        self.selected_node = None
+
+    def on_zoom(self, value=None):
+        scale = float(value) if value else self.zoom_var.get()
+        self.canvas.scale('all', 0, 0, scale / getattr(self, '_last_zoom', 1.0), scale / getattr(self, '_last_zoom', 1.0))
+        self._last_zoom = scale
 
     def close(self):
         if self.on_apply:

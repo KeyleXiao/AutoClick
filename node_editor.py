@@ -6,6 +6,27 @@ from PIL import Image, ImageTk
 
 RUNNING_COLOR = '#c8ffd4'
 FAIL_COLOR = '#ffb3b3'
+BG_COLOR = '#f9f6ff'
+ACCENT_COLOR = '#ff6bcb'
+
+
+class NodeTypeDialog(simpledialog.Dialog):
+    """Simple dialog with a drop-down to choose the node type."""
+
+    def body(self, master):
+        master.configure(background=BG_COLOR)
+        tk.Label(master, text='Node Type', background=BG_COLOR).pack(padx=10, pady=5)
+        self.var = tk.StringVar(value='normal')
+        ttk.Combobox(
+            master,
+            textvariable=self.var,
+            values=['normal', 'condition'],
+            state='readonly',
+        ).pack(padx=10, pady=5)
+        return None
+
+    def apply(self):
+        self.result = self.var.get()
 
 class Edge:
     def __init__(self, editor, src, dst, port_type='default'):
@@ -37,7 +58,7 @@ class Node:
         self.type = item.get('type', 'normal')
         self.x = x
         self.y = y
-        self.normal_color = '#f5f5f5'
+        self.normal_color = BG_COLOR
         self.rect = editor.canvas.create_rectangle(
             x,
             y,
@@ -93,6 +114,7 @@ class Node:
             editor.canvas.tag_bind(item_id, '<B1-Motion>', self.on_drag)
             editor.canvas.tag_bind(item_id, '<ButtonRelease-1>', self.on_release)
             editor.canvas.tag_bind(item_id, '<Double-1>', self.edit)
+            editor.canvas.tag_bind(item_id, '<Button-3>', self.show_menu)
         if self.type == 'condition':
             editor.canvas.tag_bind(
                 self.out_port_success,
@@ -162,8 +184,11 @@ class Node:
             self.editor.canvas.after_cancel(self._press_job)
             self._press_job = None
         self.drag_data = None
-        if self.editor.start_node is self:
-            self.editor.finish_connection()
+        if self.editor.start_node:
+            if self.editor.start_node is self:
+                self.editor.finish_connection()
+            else:
+                self.editor.finish_connection(self)
 
     def start_long_link(self):
         self._press_job = None
@@ -199,6 +224,12 @@ class Node:
                 return self.x + self.WIDTH, self.y + 2 * self.HEIGHT/3
         return self.x + self.WIDTH, self.y + self.HEIGHT/2
 
+    def show_menu(self, event):
+        self.editor.select_node(self)
+        state = 'normal' if self.editor.clipboard else 'disabled'
+        self.editor.node_menu.entryconfig('Paste', state=state)
+        self.editor.node_menu.tk_popup(event.x_root, event.y_root)
+
     def highlight_running(self):
         self.editor.canvas.itemconfigure(self.rect, fill=RUNNING_COLOR)
 
@@ -215,17 +246,22 @@ class NodeEditor(tk.Frame):
         self.items = items
         self.on_apply = on_apply
         self.master.protocol('WM_DELETE_WINDOW', self.close)
-        toolbar = tk.Frame(self)
+        self.configure(background=BG_COLOR)
+        toolbar = tk.Frame(self, bg=BG_COLOR)
         toolbar.pack(fill='x')
-        tk.Button(toolbar, text='Add Node', command=self.add_node).pack(side='left')
-        tk.Button(toolbar, text='Copy', command=self.copy_node).pack(side='left')
-        tk.Button(toolbar, text='Paste', command=self.paste_node).pack(side='left')
-        tk.Button(toolbar, text='Delete', command=self.delete_node).pack(side='left')
-        self.canvas = tk.Canvas(self, bg='white')
+        tk.Button(
+            toolbar,
+            text='Add Node',
+            command=self.add_node,
+            bg=ACCENT_COLOR,
+            fg='white',
+            activebackground=ACCENT_COLOR,
+        ).pack(side='left', padx=2, pady=2)
+        self.canvas = tk.Canvas(self, bg='#333333')
         self.canvas.pack(fill='both', expand=True)
-        zoom_frame = tk.Frame(self)
+        zoom_frame = tk.Frame(self, bg=BG_COLOR)
         zoom_frame.pack(fill='x', side='bottom')
-        tk.Label(zoom_frame, text='Zoom').pack(side='left')
+        tk.Label(zoom_frame, text='Zoom', bg=BG_COLOR).pack(side='left')
         self.zoom_var = tk.DoubleVar(value=1.0)
         self._last_zoom = 1.0
         ttk.Scale(zoom_frame, from_=0.5, to=2.0, variable=self.zoom_var, command=self.on_zoom).pack(side='right', fill='x', expand=True)
@@ -236,6 +272,10 @@ class NodeEditor(tk.Frame):
         self.start_node = None
         self.selected_node = None
         self.clipboard = None
+        self.node_menu = tk.Menu(self, tearoff=0)
+        self.node_menu.add_command(label='Copy', command=self.copy_node)
+        self.node_menu.add_command(label='Paste', command=self.paste_node)
+        self.node_menu.add_command(label='Delete', command=self.delete_node)
         for i, item in enumerate(items):
             node = Node(self, item, x=60 + i*160, y=60)
             self.nodes.append(node)
@@ -243,14 +283,9 @@ class NodeEditor(tk.Frame):
         self.pack(fill='both', expand=True)
 
     def add_node(self):
-        node_type = simpledialog.askstring(
-            'Node Type', 'Type (normal/condition):', parent=self.master
-        )
+        dialog = NodeTypeDialog(self.master)
+        node_type = getattr(dialog, 'result', None)
         if not node_type:
-            return
-        node_type = node_type.lower()
-        if node_type not in ('normal', 'condition'):
-            messagebox.showerror('Error', 'Invalid node type')
             return
         item = {'type': node_type}
         node = Node(self, item, x=60, y=60)
@@ -261,7 +296,7 @@ class NodeEditor(tk.Frame):
         if self.selected_node and self.selected_node is not node:
             self.canvas.itemconfigure(self.selected_node.rect, outline='#333')
         self.selected_node = node
-        self.canvas.itemconfigure(node.rect, outline='#ff6bcb')
+        self.canvas.itemconfigure(node.rect, outline=ACCENT_COLOR)
 
     def copy_node(self):
         if self.selected_node:

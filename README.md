@@ -16,7 +16,6 @@ AutoClick was inspired by my other open source project KeyleFinder. It was creat
 - Optional PyAutoGUI fail-safe toggle
 - Trash button to delete items from the list
 - Works on Windows, Linux and macOS
-- Visual node editor to arrange execution order
 
 ## Requirements
 
@@ -88,7 +87,6 @@ AutoClick 是一个自动点击工具，通过配置模板图像来实现模拟�
 - 全局热键触发搜索
 - 提供删除按钮可移除列表项
 - 支持 Windows、Linux 和 macOS
-- 新增可视化节点编辑器方便调整执行顺序
 - 在 macOS 中，需在「系统设置 → 隐私与安全 → 辅助功能」中为 Python 或终端
   授权，以便程序能够控制鼠标和键盘
 

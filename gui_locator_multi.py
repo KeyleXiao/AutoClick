@@ -196,8 +196,6 @@ class App(tk.Tk):
         setting_btn = ttk.Button(top, text='⚙', width=3, command=self.open_settings)
         setting_btn.pack(side='left', padx=2)
 
-        node_btn = ttk.Button(top, text='Nodes', command=self.open_node_editor)
-        node_btn.pack(side='left', padx=2)
 
         about_btn = ttk.Button(top, text='About', command=self.show_about)
         about_btn.pack(side='right', padx=5)
@@ -324,15 +322,6 @@ class App(tk.Tk):
         for i in range(len(self.items)):
             self.refresh_tree_row(i)
 
-    def apply_node_order(self, ordered_items):
-        if not ordered_items:
-            return
-        self.items = ordered_items
-        self.refresh_tree()
-        self.current_index = 0
-        if self.tree.get_children():
-            self.tree.selection_set(self.tree.get_children()[0])
-            self.update_photo(0)
 
     def on_tree_double_click(self, event):
         item_id = self.tree.identify_row(event.y)
@@ -528,22 +517,6 @@ class App(tk.Tk):
     def show_about(self):
         messagebox.showinfo('About', 'KeyleFinder\nAuthor: keyle\nhttps://vrast.cn')
 
-    def open_node_editor(self):
-        try:
-            from node_editor import NodeEditor
-        except Exception as e:
-            messagebox.showerror('Error', f'Failed to load node editor: {e}')
-            return
-        win = tk.Toplevel(self)
-        win.title('Workflow Nodes')
-        win.geometry('800x600')
-        self.node_editor = NodeEditor(win, self.items, self.apply_node_order)
-        def on_close():
-            if hasattr(self, 'node_editor'):
-                self.node_editor.close()
-                self.node_editor = None
-        win.protocol('WM_DELETE_WINDOW', on_close)
-
     def open_settings(self):
         win = tk.Toplevel(self)
         win.title('Settings')
@@ -658,8 +631,6 @@ class App(tk.Tk):
 
                 item_id = self.tree.get_children()[idx]
                 self.tree.item(item_id, tags=('running',))
-                if getattr(self, 'node_editor', None) and self.node_editor.winfo_exists():
-                    self.node_editor.highlight_running(item)
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
                     screenshot = pyautogui.screenshot()
                     screenshot.save(tmp.name)
@@ -691,13 +662,10 @@ class App(tk.Tk):
                     if 'fail' in tags:
                         tags.remove('fail')
                     self.tree.item(item_id, tags=tuple(tags))
-                    if getattr(self, 'node_editor', None) and self.node_editor.winfo_exists():
-                        self.node_editor.clear_highlight(item)
                     self.log(f'Item {idx} matched at {click_x},{click_y}')
                 else:
                     self.tree.item(item_id, tags=('fail',))
-                    if getattr(self, 'node_editor', None) and self.node_editor.winfo_exists():
-                        self.node_editor.highlight_fail(item)
+                    
                     self.log(f'Item {idx} match failed')
                     if item.get('interrupt'):
                         next_idx = 0

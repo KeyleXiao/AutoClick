@@ -33,6 +33,7 @@ def load_items(config_path: str):
             path = entry['path']
         item = {
             'path': path,
+            'alias': entry.get('alias', ''),
             'action': entry.get('action', 'single' if not entry.get('double_click') else 'double'),
             'delay': entry.get('delay', 0),
             'interrupt': entry.get('interrupt', False),

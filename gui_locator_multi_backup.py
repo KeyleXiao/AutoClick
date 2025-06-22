@@ -16,7 +16,6 @@ except Exception:
 if sys.platform == 'darwin':
     from pynput import keyboard as _pynput_keyboard
 
-
     class _MacHotkey:
         def __init__(self):
             self._listener = None
@@ -45,7 +44,6 @@ if sys.platform == 'darwin':
                 self._listener = None
             self._hotkeys = {}
 
-
     keyboard = _MacHotkey()
 else:
     keyboard = _keyboard
@@ -55,9 +53,7 @@ from KeyleFinderModule import KeyleFinderModule
 
 if sys.platform == 'darwin':
     from pynput.mouse import Controller as _Mouse
-
     _mouse = _Mouse()
-
 
     def move_mouse(x, y):
         _mouse.position = (x, y)
@@ -201,6 +197,7 @@ class App(tk.Tk):
         setting_btn = ttk.Button(top, text='⚙', width=3, command=self.open_settings)
         setting_btn.pack(side='left', padx=2)
 
+
         about_btn = ttk.Button(top, text='About', command=self.show_about)
         about_btn.pack(side='right', padx=5)
 
@@ -255,9 +252,9 @@ class App(tk.Tk):
         # else:
         #     print('Warning: global hotkeys are unavailable')
         #     self.log('热键不可用 - 请在系统偏好设置中授予辅助功能权限')
-
+        
         self.log('使用界面按钮控制 - 点击▶开始搜索')
-
+        
         self.protocol('WM_DELETE_WINDOW', self.on_close)
 
     def log(self, msg):
@@ -334,6 +331,7 @@ class App(tk.Tk):
             self.tree.insert('', 'end', text=os.path.basename(item['path']), values=('', '', '', '', ''))
         for i in range(len(self.items)):
             self.refresh_tree_row(i)
+
 
     def on_tree_double_click(self, event):
         item_id = self.tree.identify_row(event.y)
@@ -524,48 +522,53 @@ class App(tk.Tk):
         self.tree.selection_set(self.tree.get_children()[idx + 1])
         self.current_index = idx + 1
 
-    def update_hotkey(self, *_):
-        if not hasattr(self, 'hotkey_enabled_var') or not hasattr(self, 'hotkey_var'):
+        if not hasattr(self, "hotkey_enabled_var") or not hasattr(self, "hotkey_var"):
             return
+            
         if not self.hotkey_enabled_var.get():
             # 关闭热键 - 彻底释放监听对象
-            if hasattr(self, '_hotkey_listener') and self._hotkey_listener:
+            if hasattr(self, "_hotkey_listener") and self._hotkey_listener:
                 try:
                     self._hotkey_listener.stop()
                 except Exception:
                     pass
                 self._hotkey_listener = None
             self.hotkey_available = False
-            self.log('热键已关闭')
+            self.log("热键已关闭")
             return
+            
         # 启用热键 - 动态import pynput
         try:
             # 只有在需要时才import pynput
             from pynput import keyboard as _pynput_keyboard
+            
             # 停止之前的监听器
-            if hasattr(self, '_hotkey_listener') and self._hotkey_listener:
+            if hasattr(self, "_hotkey_listener") and self._hotkey_listener:
                 try:
                     self._hotkey_listener.stop()
                 except Exception:
                     pass
+            
             # 创建新的热键映射
             hotkeys = {
-                f'<{self.hotkey_var.get().lower()}>': self.toggle_search,
-                '<esc>': self.stop_search
-            }
+                f"<{self.hotkey_var.get().lower()}>": self.toggle_search,
+                "<esc>": self.stop_search
+        ttk.Checkbutton(win, text="启用全局热键", variable=self.hotkey_enabled_var, command=self.update_hotkey).pack(anchor="w", padx=10, pady=(10, 0))
+        ttk.Label(win, text="勾选后可用F2/ESC全局快捷键（需系统辅助权限）").pack(anchor="w", padx=30, pady=(0, 5))            }
+            
             # 创建并启动监听器
             self._hotkey_listener = _pynput_keyboard.GlobalHotKeys(hotkeys)
             self._hotkey_listener.start()
             self.hotkey_available = True
-            self.log('热键已启用 - 按F2开始/ESC停止（需辅助权限）')
+            self.log("热键已启用 - 按F2开始/ESC停止（需辅助权限）")
+            
         except Exception as e:
-            print(f'Warning: global hotkeys are unavailable: {e}')
+            print(f"Warning: global hotkeys are unavailable: {e}")
             self.hotkey_available = False
-            self.log('热键不可用 - 请在系统偏好设置中授予辅助功能权限')
+            self.log("热键不可用 - 请在系统偏好设置中授予辅助功能权限")
             # 确保监听器被清理
-            if hasattr(self, '_hotkey_listener'):
+            if hasattr(self, "_hotkey_listener"):
                 self._hotkey_listener = None
-
     def update_failsafe(self, *_):
         pyautogui.FAILSAFE = self.failsafe_var.get()
 
@@ -594,11 +597,6 @@ class App(tk.Tk):
         loop_chk.pack(anchor='w', padx=10, pady=(0, 0))
         ttk.Label(win, text='完成后从头开始重复').pack(anchor='w', padx=30, pady=(0, 5))
         loop_chk.config(style='Danger.TCheckbutton')
-
-        ttk.Checkbutton(win, text='启用全局热键', variable=self.hotkey_enabled_var, command=self.update_hotkey).pack(
-            anchor='w', padx=10, pady=(10, 0))
-        ttk.Label(win, text='勾选后可用F2/ESC全局快捷键（需系统辅助权限）').pack(anchor='w', padx=30, pady=(0, 5))
-
         ttk.Label(win, text='Hotkey:').pack(anchor='w', padx=10, pady=(10, 0))
         ttk.Combobox(win, width=4, state='readonly',
                      values=HOTKEY_OPTIONS, textvariable=self.hotkey_var).pack(anchor='w', padx=10, pady=(0, 0))
@@ -725,7 +723,7 @@ class App(tk.Tk):
                     self.log(f'Item {idx} matched at {click_x},{click_y}')
                 else:
                     self.tree.item(item_id, tags=('fail',))
-
+                    
                     self.log(f'Item {idx} match failed')
                     if item.get('interrupt'):
                         next_idx = 0
@@ -741,14 +739,13 @@ class App(tk.Tk):
         self.finish_search_func = finish_search
         self.run_after_id = self.after(100, lambda: run_items(start_idx))
 
-    def on_close(self):
         # 清理热键监听器
-        if hasattr(self, '_hotkey_listener') and self._hotkey_listener:
+        if hasattr(self, "_hotkey_listener") and self._hotkey_listener:
             try:
                 self._hotkey_listener.stop()
             except Exception:
                 pass
-        self.destroy()
+        self.destroy()        self.destroy()
 
 
 def main():
